@@ -61,6 +61,8 @@ export const TARIFS_CHANTIER_DEFAULT = {
   coeffFoisonnement: 1.3,              // terre foisonnée = excavé × 1.3
   densiteMortier: 2.3,                 // t/m³ pour mortier béton
   heuresJourChantier: 8,              // heures travail par jour
+  forfaitChauffeurMontant: 500,       // € HT par tranche
+  forfaitChauffeurHeures: 11,         // heures par tranche
 }
 
 // ===== TYPES DE SOL (multiplicateur temps) =====
@@ -387,8 +389,11 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
 
   // Tarifs horaires des ressources
   const tarifHPelleur = ress.find(r => r.id === 'pelleur_1')?.tarifHoraire || 35
-  const tarifHChauffeur = ress.find(r => r.id === 'chauffeur_1')?.tarifHoraire || 31.25
   const tarifHPoseur = ress.find(r => r.id === 'poseur_1')?.tarifHoraire || 32.5
+
+  // Forfait chauffeur par tranche (ex: 500€ / 11h)
+  const forfaitChauffeurMontant = tc.forfaitChauffeurMontant || 500
+  const forfaitChauffeurHeures = tc.forfaitChauffeurHeures || 11
 
   // Main d'œuvre détaillée (heures)
   const mo = calcMainOeuvre(engin, typeSol, distanceEvacKm, vehicule, volumeFouille, volumeDeco, epandageData, tarifsChantier, opts)
@@ -419,12 +424,9 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
   if (vehicule && mo.nbVoyEvac > 0 && distanceEvacKm > 0) {
     coutEvacVehiculeKm = Math.ceil(mo.nbVoyEvac * (distanceEvacKm * 2) * (vehicule.prixKm || 0))
   }
-  // B2. Chauffeur : heures transport évac × tarif horaire
-  const coutEvacChauffeur = Math.ceil(mo.hChauffeurEvac * tarifHChauffeur)
+  // B2. Chauffeur : heures transport évac (forfait ventilé)
   // B3. Attente pelliste pendant transport : heures × tarif pelleur
   const coutEvacAttentePelliste = Math.ceil(mo.hPellisteAttenteEvac * tarifHPelleur)
-
-  const coutEvacuationTotal = coutEvacVehiculeKm + coutEvacChauffeur + coutEvacAttentePelliste
 
   // ═══════════════════════════════════════════════════════
   // C. MORTIER — coûts additifs
@@ -433,12 +435,9 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
   // C1. Véhicule km mortier
   const coutMortierVehiculeKm = (mo.nbVoyMortier > 0 && (opts.distanceMortierKm || 0) > 0 && vMort)
     ? Math.ceil(mo.nbVoyMortier * ((opts.distanceMortierKm || 0) * 2) * (vMort.prixKm || 0)) : 0
-  // C2. Chauffeur mortier
-  const coutMortierChauffeur = Math.ceil(mo.hChauffeurMortier * tarifHChauffeur)
+  // C2. Chauffeur mortier (forfait ventilé)
   // C3. Matière mortier
   const coutMortierMatiere = Math.ceil(mo.volMortier * (tarifs.mortierM3 || 120))
-
-  const coutMortierTotal = coutMortierVehiculeKm + coutMortierChauffeur + coutMortierMatiere
 
   // ═══════════════════════════════════════════════════════
   // D. LIVRAISON MATÉRIAUX — coûts additifs
@@ -446,8 +445,22 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
   // D1. Véhicule km livraison
   const coutLivraisonVehiculeKm = ((opts.distanceLivraisonKm || 0) > 0 && vehicule)
     ? Math.ceil((opts.distanceLivraisonKm || 0) * 2 * (vehicule.prixKm || 0)) : 0
-  // D2. Chauffeur livraison
-  const coutLivraisonChauffeur = Math.ceil(mo.hChauffeurLivraison * tarifHChauffeur)
+  // D2. Chauffeur livraison (forfait ventilé)
+
+  // ── FORFAIT CHAUFFEUR : total heures → tranches → ventilation ──
+  const hChauffTotal = mo.hChauffeurEvac + mo.hChauffeurMortier + mo.hChauffeurLivraison
+  const nbTranches = hChauffTotal > 0 ? Math.ceil(hChauffTotal / forfaitChauffeurHeures) : 0
+  const coutChauffeurTotal = nbTranches * forfaitChauffeurMontant
+  // Tarif horaire effectif pour affichage (= forfait lissé)
+  const tarifHChauffeur = hChauffTotal > 0 ? Math.round(coutChauffeurTotal / hChauffTotal * 100) / 100 : 0
+  // Ventilation au prorata des heures par poste
+  const coutEvacChauffeur = hChauffTotal > 0 ? Math.ceil(coutChauffeurTotal * mo.hChauffeurEvac / hChauffTotal) : 0
+  const coutMortierChauffeur = hChauffTotal > 0 ? Math.ceil(coutChauffeurTotal * mo.hChauffeurMortier / hChauffTotal) : 0
+  const coutLivraisonChauffeur = hChauffTotal > 0 ? Math.ceil(coutChauffeurTotal * mo.hChauffeurLivraison / hChauffTotal) : 0
+
+  const coutEvacuationTotal = coutEvacVehiculeKm + coutEvacChauffeur + coutEvacAttentePelliste
+
+  const coutMortierTotal = coutMortierVehiculeKm + coutMortierChauffeur + coutMortierMatiere
 
   const coutLivraisonTotal = coutLivraisonVehiculeKm + coutLivraisonChauffeur
 
@@ -496,6 +509,8 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
     mainOeuvre: mo,
     // Tarifs utilisés
     tarifHPelleur, tarifHChauffeur, tarifHPoseur,
+    // Forfait chauffeur
+    forfaitChauffeurMontant, forfaitChauffeurHeures, nbTranchesChauffeur: nbTranches, coutChauffeurTotal,
     // ── Coûts fusionnés (vue client) ──
     coutTerrassementClient, coutTransportClient,
     coutMortierTranspClient, coutLivraisonClient,
@@ -558,7 +573,17 @@ export const useProductStore = create((set, get) => ({
         categories: cats?.length > 0 ? cats.map(c => ({ id: c.id, nom: c.nom, typeCategorie: c.data?.typeCategorie || c.type || 'autre', groupeId: c.data?.groupeId || c.groupe || 'divers', ordre: c.data?.ordre || 0, ...(c.data || {}) })) : get().categories,
         fournisseurs: fourns?.length > 0 ? fourns.map(f => ({ id: f.id, nom: f.nom, contact: f.contact, telephone: f.telephone, email: f.email, adresse: f.adresse, notes: f.notes, ...(f.data || {}) })) : get().fournisseurs,
         produits: prods?.length > 0 ? prods.map(p => ({ id: p.id, nom: p.nom, categorieId: p.categorie_id, fournisseurId: p.fournisseur_id, prix: p.prix, unite: p.unite, ...(p.data || {}) })) : get().produits,
-        vehicules: vehs?.length > 0 ? vehs.map(v => ({ id: v.id, nom: v.nom, ...(v.data || {}) })) : get().vehicules,
+        vehicules: vehs?.length > 0 ? vehs.map(v => {
+          const d = typeof v.data === 'string' ? JSON.parse(v.data) : (v.data || {})
+          return {
+            id: v.id, nom: v.nom, ...d,
+            prixKm: d.prixKm ?? v.cout_km ?? 0,
+            capaciteM3: d.capaciteM3 ?? v.capacite_m3 ?? 0,
+            ptac: d.ptac ?? v.ptac ?? 0,
+            poidsVide: d.poidsVide ?? v.poids_vide ?? 0,
+            vitesseKmh: d.vitesseKmh ?? v.vitesse_kmh ?? 45,
+          }
+        }) : get().vehicules,
         enginsData: engs?.length > 0 ? engs.map(e => ({ id: e.id, nom: e.nom, rendementM3h: e.rendement_m3h, coutHoraire: e.cout_horaire, consommationLH: e.consommation_lh, deplacement: e.deplacement, indisponibilites: e.data?.indisponibilites || [], ...(e.data || {}) })) : get().enginsData,
         ressources: ress?.length > 0 ? ress.map(r => ({ id: r.id, nom: r.nom, pin: r.pin, role: r.role, tarifJournalier: r.tarif_journalier, tarifHoraire: r.tarif_horaire, competences: r.competences || [], joursTravail: r.jours_travail || [1,2,3,4,5], indisponibilites: r.data?.indisponibilites || [], ...(r.data || {}) })) : get().ressources,
         tarifsMateriaux: tMat ? { ...TARIFS_MATERIAUX_DEFAULT, ...tMat } : get().tarifsMateriaux,
@@ -566,6 +591,9 @@ export const useProductStore = create((set, get) => ({
         loaded: true, loading: false,
       })
       console.log('[ProductStore] ✅ Données chargées depuis Supabase')
+      // Diagnostic transport — à retirer après validation
+      const vList = get().vehicules
+      if (vList.length > 0) console.log('[ProductStore] 🚛 Véhicules mappés:', vList.map(v => `${v.nom}: prixKm=${v.prixKm}, capaciteM3=${v.capaciteM3}`))
     } catch (err) {
       console.error('[ProductStore] init error:', err)
       set({ loaded: true, loading: false })
