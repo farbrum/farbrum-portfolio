@@ -205,8 +205,8 @@ export const useChantierStore = create(
         return { chantiers: { ...s.chantiers, [devisId]: { ...ch, etapes } } }
       }),
 
-      // ─── Ajouter une photo à une étape ───
-      ajouterPhoto: (devisId, etapeId, photoData, poseurNom) => set(s => {
+      // ─── Ajouter une photo à une étape (avec géolocalisation optionnelle) ───
+      ajouterPhoto: (devisId, etapeId, photoData, poseurNom, geo = null) => set(s => {
         const ch = s.chantiers[devisId]
         if (!ch) return s
         const photo = {
@@ -215,6 +215,7 @@ export const useChantierStore = create(
           dataUrl: photoData, // base64
           timestamp: new Date().toISOString(),
           poseur: poseurNom,
+          geo: geo || null, // { lat, lng, accuracy }
         }
         // Ajouter aux photos globales
         const photos = [...ch.photos, photo]
@@ -258,6 +259,17 @@ export const useChantierStore = create(
           photoUrl: data.photoUrl || null,
         }
         return { chantiers: { ...s.chantiers, [devisId]: { ...ch, spanc: [...ch.spanc, visite] } } }
+      }),
+
+      // ─── Signature fin de chantier ───
+      ajouterSignature: (devisId, signatureData) => set(s => {
+        const ch = s.chantiers[devisId]
+        if (!ch) return s
+        const signatures = [...(ch.signatures || []), {
+          id: Date.now().toString(),
+          ...signatureData,
+        }]
+        return { chantiers: { ...s.chantiers, [devisId]: { ...ch, signatures } } }
       }),
 
       // ─── Notes chantier ───

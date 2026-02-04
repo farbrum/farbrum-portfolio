@@ -1,9 +1,22 @@
 {
-  "name": "F.Arbrum",
+  "name": "F.Arbrum - Gestion ANC",
   "short_name": "F.Arbrum",
-  "description": "Gestion de devis d'assainissement",
+  "description": "Gestion de devis et suivi de chantier d'assainissement",
   "start_url": "/",
   "display": "standalone",
   "background_color": "#0a0a0a",
-  "theme_color": "#C8509B"
+  "theme_color": "#C8509B",
+  "orientation": "portrait",
+  "icons": [
+    {
+      "src": "/logo.jpg",
+      "sizes": "192x192",
+      "type": "image/jpeg"
+    },
+    {
+      "src": "/logo.jpg",
+      "sizes": "512x512",
+      "type": "image/jpeg"
+    }
+  ]
 }

@@ -35,9 +35,9 @@ export const ENGINS = [
 
 // ===== RESSOURCES HUMAINES =====
 export const RESSOURCES_HUMAINES_DEFAULT = [
-  { id: 'pelleur_1', nom: 'Pelleur / Conducteur engin', tarifJournalier: 280, tarifHoraire: 35, competences: ['excavation','pose','remblai'], indisponibilites: [] },
-  { id: 'chauffeur_1', nom: 'Chauffeur PL / Tracteur', tarifJournalier: 250, tarifHoraire: 31.25, competences: ['transport','livraison'], indisponibilites: [] },
-  { id: 'poseur_1', nom: 'Poseur / Tuyauteur', tarifJournalier: 260, tarifHoraire: 32.5, competences: ['pose','tuyauterie','collage'], indisponibilites: [] },
+  { id: 'pelleur_1', nom: 'Pelleur / Conducteur engin', pin: '1234', roles: ['pelleur'], role: 'pelleur', tarifJournalier: 280, tarifHoraire: 35, competences: ['excavation','pose','remblai'], joursTravail: [1,2,3,4,5,6], vacances: [], indisponibilites: [] },
+  { id: 'chauffeur_1', nom: 'Chauffeur PL / Tracteur', pin: '5678', roles: ['chauffeur'], role: 'chauffeur', tarifJournalier: 250, tarifHoraire: 31.25, competences: ['transport','livraison'], joursTravail: [1,2,3,4,5], vacances: [], indisponibilites: [] },
+  { id: 'poseur_1', nom: 'Poseur / Tuyauteur', pin: '9012', roles: ['poseur'], role: 'poseur', tarifJournalier: 260, tarifHoraire: 32.5, competences: ['pose','tuyauterie','collage'], joursTravail: [1,2,3,4,5], vacances: [], indisponibilites: [] },
 ]
 
 // ===== TARIFS MATÉRIAUX =====
@@ -598,6 +598,16 @@ export const useProductStore = create(
               consommationLH: e.consommationLH ?? ref?.consommationLH ?? 0,
             }
           })
+        }
+        // Migration ressources: ajouter PIN, roles, joursTravail, vacances si absents
+        if (state.ressources) {
+          state.ressources = state.ressources.map((r, i) => ({
+            ...r,
+            pin: r.pin || String(1000 + i * 1111).slice(0, 4),
+            roles: r.roles || (r.role ? [r.role] : ['poseur']),
+            joursTravail: r.joursTravail || [1,2,3,4,5],
+            vacances: r.vacances || [],
+          }))
         }
       },
     }

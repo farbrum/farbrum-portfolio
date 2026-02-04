@@ -3,7 +3,7 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
 import { useAuthStore } from '../store/authStore'
 import { pdfService } from '../services/pdfService'
-import { ArrowLeft, Download, Eye, Trash2, HardHat, Pencil, EyeOff, FileText, Layers, Clipboard, ExternalLink } from 'lucide-react'
+import { ArrowLeft, Download, Eye, Trash2, HardHat, Pencil, EyeOff, FileText, Layers } from 'lucide-react'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import Window from '../components/Window'
@@ -57,45 +57,54 @@ export default function DevisDetail() {
 
     {/* QR CODES PANEL */}
     {showQR&&isAdmin&&<div className="mb-4">
-      <Window title="📱 QR Codes — Accès chantier"><div className="p-5">
+      <Window title="📱 QR Code Chantier — Identification par PIN"><div className="p-5">
         {(() => {
           const baseUrl = window.location.origin
           const ressources = useProductStore.getState().ressources || []
           const poseurs = ressources.filter(r => r.competences?.includes('pose') || r.competences?.includes('excavation'))
-          const urlPoseur = buildChantierUrl(baseUrl, id, '')
+          const urlChantier = buildChantierUrl(baseUrl, id)
 
-          return <div className="space-y-4">
-            {/* QR Poseurs individuels */}
+          return <div className="grid md:grid-cols-2 gap-6">
+            {/* QR unique */}
+            <div className="text-center">
+              <p className="text-xs text-gray-400 font-bold mb-3">📷 QR unique — à imprimer / envoyer</p>
+              <div className="inline-block bg-white/[0.02] border border-white/10 rounded-2xl p-4">
+                <QRCodeDisplay url={urlChantier} size={160} />
+                <p className="text-xs text-white font-bold mt-3">{devis.client?.nom || 'Client'}</p>
+                <p className="text-[9px] text-gray-500">{devis.numeroDevis}</p>
+              </div>
+              <div className="mt-3 flex items-center justify-center space-x-2">
+                <input type="text" readOnly value={urlChantier} className="w-56 h-8 px-2 bg-bg-input border border-white/10 rounded text-[9px] text-gray-400" onClick={e => e.target.select()} />
+                <button onClick={() => navigator.clipboard?.writeText(urlChantier)} className="h-8 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded text-emerald-400 text-[10px] font-bold">📋 Copier</button>
+                <a href={urlChantier} target="_blank" className="h-8 px-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded text-blue-400 text-[10px] font-bold flex items-center">👁️ Tester</a>
+              </div>
+            </div>
+
+            {/* Codes PIN poseurs */}
             <div>
-              <p className="text-xs text-gray-400 font-bold mb-3">👷 QR par poseur — le poseur scanne → accès direct à sa fiche</p>
-              <div className="flex flex-wrap gap-4">
+              <p className="text-xs text-gray-400 font-bold mb-3">🔑 Codes PIN poseurs — à communiquer individuellement</p>
+              <div className="space-y-2">
                 {poseurs.length > 0 ? poseurs.map(p => (
-                  <div key={p.id} className="text-center bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                    <QRCodeDisplay url={buildChantierUrl(baseUrl, id, p.nom)} size={120} />
-                    <p className="text-xs text-white font-bold mt-2">{p.nom}</p>
-                    <p className="text-[8px] text-gray-500">{p.competences?.join(', ')}</p>
+                  <div key={p.id} className="flex items-center justify-between bg-white/[0.02] border border-white/10 rounded-xl p-3">
+                    <div>
+                      <p className="text-sm text-white font-bold">{p.nom}</p>
+                      <p className="text-[9px] text-gray-500">{p.competences?.join(', ')}</p>
+                    </div>
+                    <div className="flex items-center space-x-1.5">
+                      {(p.pin || '????').split('').map((c, i) => (
+                        <span key={i} className="w-8 h-10 bg-gray-800 border border-white/20 rounded-lg flex items-center justify-center text-lg font-mono font-bold text-rose">{c}</span>
+                      ))}
+                    </div>
                   </div>
                 )) : (
-                  <div className="text-center bg-white/[0.02] border border-white/10 rounded-xl p-3">
-                    <QRCodeDisplay url={buildChantierUrl(baseUrl, id, 'Poseur')} size={120} />
-                    <p className="text-xs text-white font-bold mt-2">Poseur générique</p>
-                    <p className="text-[8px] text-gray-500">Ajoutez des poseurs dans Ressources Humaines</p>
+                  <div className="text-center py-6 text-gray-600 text-sm">
+                    <p>Aucun poseur configuré</p>
+                    <p className="text-[10px] mt-1">Ajoutez des poseurs avec compétence "pose" dans<br/>Ressources Humaines + définissez leur code PIN</p>
                   </div>
                 )}
               </div>
+              <p className="text-[9px] text-gray-600 mt-3">💡 Le poseur scanne le QR → entre son code PIN → accède à sa fiche de suivi chantier</p>
             </div>
-
-            {/* Lien direct */}
-            <div className="bg-white/[0.02] border border-white/10 rounded-xl p-4">
-              <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">🔗 Lien direct (copier / envoyer par SMS)</p>
-              <div className="flex items-center space-x-2">
-                <input type="text" readOnly value={urlPoseur} className="flex-1 h-9 px-3 bg-bg-input border border-white/10 rounded text-xs text-gray-400" onClick={e => e.target.select()} />
-                <button onClick={() => navigator.clipboard?.writeText(urlPoseur)} className="h-9 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded text-emerald-400 text-xs font-bold">📋 Copier</button>
-                <a href={buildChantierUrl(baseUrl, id, 'Admin')} target="_blank" className="h-9 px-3 bg-blue-500/10 hover:bg-blue-500/20 border border-blue-500/20 rounded text-blue-400 text-xs font-bold flex items-center">👁️ Tester</a>
-              </div>
-            </div>
-
-            <p className="text-[9px] text-gray-600">💡 Pour accéder depuis un téléphone sur le même WiFi, lancez l'app avec <code className="text-rose">npx vite --host</code> puis utilisez l'adresse réseau.</p>
           </div>
         })()}
       </div></Window>
@@ -151,113 +160,38 @@ export default function DevisDetail() {
           {hasMulti?(<>{scenarios.map((sc,idx)=>(<div key={idx} className="flex space-x-1"><button type="button" onClick={()=>handlePdfOpen(idx)} className={`flex-1 h-8 text-[10px] font-medium rounded border flex items-center justify-center space-x-1 ${scColors[sc.scenarioId]} ${scText[sc.scenarioId]} hover:opacity-80`}><Eye className="w-3 h-3"/><span>Aperçu {idx+1}</span></button><button type="button" onClick={()=>handlePdfDL(idx)} className={`flex-1 h-8 text-[10px] font-medium rounded border flex items-center justify-center space-x-1 ${scColors[sc.scenarioId]} ${scText[sc.scenarioId]} hover:opacity-80`}><Download className="w-3 h-3"/><span>DL {idx+1}</span></button></div>))}<button type="button" onClick={()=>pdfService.combinerPDF(devis)} className="w-full h-8 mt-1 bg-rose/10 hover:bg-rose/20 text-rose text-[10px] font-bold rounded border border-rose/30 flex items-center justify-center space-x-1"><Layers className="w-3 h-3"/><span>📄 Combiner tous les scénarios (1 PDF)</span></button><button type="button" onClick={()=>pdfService.telechargerTousScenarios(devis)} className="w-full h-8 mt-1 bg-white/5 hover:bg-white/10 text-gray-300 text-[10px] font-medium rounded border border-white/10 flex items-center justify-center space-x-1"><Layers className="w-3 h-3"/><span>Télécharger séparément (3 PDF)</span></button></>):(<><button type="button" onClick={()=>handlePdfOpen(0)} className="w-full h-9 bg-rose/10 hover:bg-rose/20 text-rose text-xs font-medium rounded border border-rose/30 flex items-center justify-center space-x-1.5"><Eye className="w-3.5 h-3.5"/><span>Aperçu PDF</span></button><button type="button" onClick={()=>handlePdfDL(0)} className="w-full h-9 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded border border-white/10 flex items-center justify-center space-x-1.5"><Download className="w-3.5 h-3.5"/><span>Télécharger PDF</span></button></>)}
         </div></Window>
 
-        {/* QR CODES */}
-        {isAdmin&&<Window title="📱 QR Codes chantier"><div className="p-4 space-y-4">
-          {(() => {
-            const baseUrl = window.location.origin
-            const ressources = useProductStore.getState().ressources || []
-            const poseurs = ressources.filter(r => r.competences?.includes('pose') || r.competences?.includes('excavation'))
-            const chantier = useChantierStore.getState().chantiers[id]
-            const progression = useChantierStore.getState().getProgression(id)
-
-            return <>
-              {/* QR Poseur */}
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">👷 Accès poseur</p>
-                <div className="flex flex-wrap gap-3">
-                  {poseurs.length > 0 ? poseurs.map(p => (
-                    <div key={p.id} className="text-center">
-                      <QRCodeDisplay
-                        url={buildChantierUrl(baseUrl, id, p.nom)}
-                        size={100}
-                        label={p.nom}
-                      />
-                    </div>
-                  )) : (
-                    <QRCodeDisplay
-                      url={buildChantierUrl(baseUrl, id, 'Poseur')}
-                      size={120}
-                      label="Poseur générique"
-                    />
-                  )}
-                </div>
+        {/* SUIVI CHANTIER */}
+        {isAdmin&&(() => {
+          const chantierData = useChantierStore.getState().chantiers[id]
+          const prog = useChantierStore.getState().getProgression(id)
+          if (!chantierData) return null
+          return <Window title="📊 Suivi chantier"><div className="p-4 space-y-3">
+            <div className="flex items-center space-x-2 mb-2">
+              <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
+                <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${prog.pct}%` }} />
               </div>
-
-              {/* Lien direct */}
-              <div>
-                <p className="text-[10px] text-gray-500 uppercase font-bold mb-1">🔗 Lien direct</p>
-                <div className="flex items-center space-x-1">
-                  <input
-                    type="text"
-                    readOnly
-                    value={buildChantierUrl(baseUrl, id, '')}
-                    className="flex-1 h-7 px-2 bg-bg-input border border-white/10 rounded text-[9px] text-gray-400"
-                    onClick={e => e.target.select()}
-                  />
-                  <button
-                    onClick={() => navigator.clipboard?.writeText(buildChantierUrl(baseUrl, id, ''))}
-                    className="h-7 px-2 bg-white/5 hover:bg-white/10 border border-white/10 rounded text-gray-400"
-                    title="Copier"
-                  >
-                    <Clipboard size={12} />
-                  </button>
-                  <a
-                    href={buildChantierUrl(baseUrl, id, 'Admin')}
-                    target="_blank"
-                    className="h-7 px-2 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded text-emerald-400 flex items-center"
-                    title="Ouvrir"
-                  >
-                    <ExternalLink size={12} />
-                  </a>
+              <span className="text-[10px] text-emerald-400 font-bold">{prog.pct}%</span>
+            </div>
+            <div className="grid grid-cols-3 gap-1 text-center">
+              <div className="bg-bg-input border border-white/5 rounded p-1.5"><p className="text-xs font-bold text-white">{chantierData.photos?.length || 0}</p><p className="text-[8px] text-gray-500">📸 Photos</p></div>
+              <div className="bg-bg-input border border-white/5 rounded p-1.5"><p className="text-xs font-bold text-white">{chantierData.passages?.length || 0}</p><p className="text-[8px] text-gray-500">📋 Passages</p></div>
+              <div className="bg-bg-input border border-white/5 rounded p-1.5"><p className="text-xs font-bold text-white">{chantierData.spanc?.length || 0}</p><p className="text-[8px] text-gray-500">🔵 SPANC</p></div>
+            </div>
+            <div className="space-y-1">
+              {PROCEDURE_ANC.map(phase => {
+                const done = phase.etapes.every(e => chantierData.etapes[e.id]?.fait || (e.type === 'photo' && chantierData.photos?.some(p => p.etapeId === e.id)))
+                const started = phase.etapes.some(e => chantierData.etapes[e.id]?.fait || chantierData.photos?.some(p => p.etapeId === e.id))
+                return <div key={phase.id} className="flex items-center space-x-2">
+                  <span className="text-[10px]">{done ? '✅' : started ? '🔶' : '⬜'}</span>
+                  <span className={`text-[10px] ${done ? 'text-emerald-400' : started ? 'text-amber-400' : 'text-gray-600'}`}>{phase.phase}. {phase.titre}</span>
                 </div>
-              </div>
-
-              {/* Progression chantier */}
-              {chantier && (
-                <div>
-                  <p className="text-[10px] text-gray-500 uppercase font-bold mb-2">📊 Suivi chantier</p>
-                  <div className="flex items-center space-x-2 mb-2">
-                    <div className="flex-1 h-2.5 bg-white/5 rounded-full overflow-hidden">
-                      <div className="h-full bg-gradient-to-r from-emerald-500 to-emerald-400 rounded-full" style={{ width: `${progression.pct}%` }} />
-                    </div>
-                    <span className="text-[10px] text-emerald-400 font-bold">{progression.pct}%</span>
-                  </div>
-                  <div className="grid grid-cols-3 gap-1 text-center">
-                    <div className="bg-bg-input border border-white/5 rounded p-1.5">
-                      <p className="text-xs font-bold text-white">{chantier.photos?.length || 0}</p>
-                      <p className="text-[8px] text-gray-500">📸 Photos</p>
-                    </div>
-                    <div className="bg-bg-input border border-white/5 rounded p-1.5">
-                      <p className="text-xs font-bold text-white">{chantier.passages?.length || 0}</p>
-                      <p className="text-[8px] text-gray-500">📋 Passages</p>
-                    </div>
-                    <div className="bg-bg-input border border-white/5 rounded p-1.5">
-                      <p className="text-xs font-bold text-white">{chantier.spanc?.length || 0}</p>
-                      <p className="text-[8px] text-gray-500">🔵 SPANC</p>
-                    </div>
-                  </div>
-                  <div className="mt-2 space-y-1">
-                    {PROCEDURE_ANC.map(phase => {
-                      const done = phase.etapes.every(e => chantier.etapes[e.id]?.fait || (e.type === 'photo' && chantier.photos?.some(p => p.etapeId === e.id)))
-                      const started = phase.etapes.some(e => chantier.etapes[e.id]?.fait || chantier.photos?.some(p => p.etapeId === e.id))
-                      return (
-                        <div key={phase.id} className="flex items-center space-x-2">
-                          <span className="text-[10px]">{done ? '✅' : started ? '🔶' : '⬜'}</span>
-                          <span className={`text-[10px] ${done ? 'text-emerald-400' : started ? 'text-amber-400' : 'text-gray-600'}`}>{phase.phase}. {phase.titre}</span>
-                        </div>
-                      )
-                    })}
-                  </div>
-                  {chantier.statut && (
-                    <p className={`text-[10px] font-bold mt-2 ${chantier.statut === 'termine' ? 'text-emerald-400' : chantier.statut === 'pause_spanc' ? 'text-blue-400' : 'text-amber-400'}`}>
-                      {chantier.statut === 'termine' ? '✅ Chantier terminé' : chantier.statut === 'pause_spanc' ? '⏸️ En attente SPANC' : '🔶 En cours'}
-                    </p>
-                  )}
-                </div>
-              )}
-            </>
-          })()}
-        </div></Window>}
+              })}
+            </div>
+            {chantierData.statut && <p className={`text-[10px] font-bold ${chantierData.statut === 'termine' ? 'text-emerald-400' : chantierData.statut === 'pause_spanc' ? 'text-blue-400' : 'text-amber-400'}`}>
+              {chantierData.statut === 'termine' ? '✅ Terminé' : chantierData.statut === 'pause_spanc' ? '⏸️ Attente SPANC' : '🔶 En cours'}
+            </p>}
+          </div></Window>
+        })()}
 
         {isAdmin&&<Window title="Statut"><div className="p-4"><select value={devis.statut} onChange={e=>updateDevis(id,{statut:e.target.value})} className="w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose/30 focus:border-rose">{Object.entries(stLabel).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div></Window>}
 

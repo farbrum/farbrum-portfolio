@@ -43,12 +43,9 @@ export async function generateQRDataUrl(url, size = 200) {
   }
 }
 
-// ─── Générer l'URL du chantier pour un poseur ───
-export function buildChantierUrl(baseUrl, devisId, poseurNom = '') {
-  const params = new URLSearchParams()
-  if (poseurNom) params.set('poseur', poseurNom)
-  params.set('role', 'poseur')
-  return `${baseUrl}/chantier/${devisId}?${params.toString()}`
+// ─── Générer l'URL du chantier (unique, identification par PIN) ───
+export function buildChantierUrl(baseUrl, devisId) {
+  return `${baseUrl}/chantier/${devisId}`
 }
 
 // ─── Générer l'URL client ───

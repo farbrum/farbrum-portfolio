@@ -1,8 +1,10 @@
 import { useState, useRef, useEffect, useMemo } from 'react'
-import { useParams, useSearchParams, useNavigate } from 'react-router-dom'
+import { useParams } from 'react-router-dom'
 import { useChantierStore, PROCEDURE_ANC } from '../store/chantierStore'
 import { useDevisStore } from '../store/devisStore'
-import { Camera, Check, ChevronDown, ChevronUp, Clock, LogOut, Shield, X, Trash2, MessageSquare, Image, AlertTriangle, CheckCircle } from 'lucide-react'
+import { useProductStore } from '../store/productStore'
+import { Camera, Check, ChevronDown, ChevronUp, Clock, LogOut, Shield, X, Trash2, MessageSquare, Image, AlertTriangle, CheckCircle, Lock, Pen } from 'lucide-react'
+import SignaturePad from '../components/SignaturePad'
 
 // ─── Compression photo ───
 function compressImage(dataUrl, maxWidth = 1200, quality = 0.6) {
@@ -33,39 +35,155 @@ function fmtHeure(iso) {
   return new Date(iso).toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }
 
+// ═══════════════════════════════════════════════════════
+// ÉCRAN PIN — Identification du poseur
+// ═══════════════════════════════════════════════════════
+function EcranPIN({ devis, onIdentifie }) {
+  const [pin, setPin] = useState('')
+  const [erreur, setErreur] = useState('')
+  const [shake, setShake] = useState(false)
+  const ressources = useProductStore(s => s.ressources) || []
+
+  const handleDigit = (d) => {
+    if (pin.length >= 4) return
+    const newPin = pin + d
+    setPin(newPin)
+    setErreur('')
+
+    // Vérifier automatiquement à 4 chiffres
+    if (newPin.length === 4) {
+      const found = ressources.find(r => r.pin === newPin)
+      if (found) {
+        onIdentifie(found)
+      } else {
+        setErreur('Code PIN inconnu')
+        setShake(true)
+        setTimeout(() => { setPin(''); setShake(false) }, 600)
+      }
+    }
+  }
+
+  const handleDelete = () => {
+    setPin(p => p.slice(0, -1))
+    setErreur('')
+  }
+
+  return (
+    <div className="min-h-screen bg-gray-950 flex flex-col items-center justify-center p-6">
+      {/* Header */}
+      <div className="text-center mb-8">
+        <div className="w-16 h-16 bg-rose/10 border border-rose/30 rounded-2xl flex items-center justify-center mx-auto mb-4">
+          <Lock className="w-8 h-8 text-rose" />
+        </div>
+        <h1 className="text-xl font-bold text-white mb-1">Identification</h1>
+        <p className="text-sm text-gray-400">{devis?.client?.nom || 'Chantier'}</p>
+        <p className="text-[10px] text-gray-600">{devis?.client?.adresse || ''}</p>
+        <p className="text-[10px] text-gray-600 mt-1">N° {devis?.numeroDevis}</p>
+      </div>
+
+      {/* Indicateur PIN */}
+      <div className={`flex items-center justify-center space-x-4 mb-4 ${shake ? 'animate-shake' : ''}`}>
+        {[0,1,2,3].map(i => (
+          <div key={i} className={`w-4 h-4 rounded-full transition-all duration-200 ${
+            i < pin.length ? 'bg-rose scale-110' : 'bg-white/10 border border-white/20'
+          }`} />
+        ))}
+      </div>
+
+      {/* Message erreur */}
+      <div className="h-6 mb-4">
+        {erreur ? (
+          <p className="text-red-400 text-sm font-medium">{erreur}</p>
+        ) : (
+          <p className="text-gray-600 text-sm">Entrez votre code PIN à 4 chiffres</p>
+        )}
+      </div>
+
+      {/* Clavier numérique */}
+      <div className="grid grid-cols-3 gap-3 w-64">
+        {[1,2,3,4,5,6,7,8,9].map(d => (
+          <button
+            key={d}
+            onClick={() => handleDigit(String(d))}
+            className="w-20 h-14 rounded-xl bg-white/5 border border-white/10 text-white text-xl font-bold active:bg-rose/20 active:border-rose/40 transition-all"
+          >
+            {d}
+          </button>
+        ))}
+        <div /> {/* espace vide */}
+        <button
+          onClick={() => handleDigit('0')}
+          className="w-20 h-14 rounded-xl bg-white/5 border border-white/10 text-white text-xl font-bold active:bg-rose/20 active:border-rose/40 transition-all"
+        >
+          0
+        </button>
+        <button
+          onClick={handleDelete}
+          className="w-20 h-14 rounded-xl bg-white/5 border border-white/10 text-gray-400 text-sm font-bold active:bg-red-500/20 transition-all"
+        >
+          ←
+        </button>
+      </div>
+
+      {/* Info */}
+      <p className="text-[9px] text-gray-700 mt-8 text-center">Votre code PIN se trouve dans les paramètres<br/>ou demandez-le à votre responsable</p>
+
+      {/* Style animation shake */}
+      <style>{`
+        @keyframes shake { 0%,100%{transform:translateX(0)} 20%,60%{transform:translateX(-8px)} 40%,80%{transform:translateX(8px)} }
+        .animate-shake { animation: shake 0.4s ease-in-out; }
+      `}</style>
+    </div>
+  )
+}
+
+// ═══════════════════════════════════════════════════════
+// FICHE POSEUR — Interface principale
+// ═══════════════════════════════════════════════════════
 export default function FichePoseur() {
   const { devisId } = useParams()
-  const [searchParams] = useSearchParams()
-  const navigate = useNavigate()
 
-  const poseurNom = searchParams.get('poseur') || searchParams.get('uid') || 'Poseur'
-  const role = searchParams.get('role') || 'poseur'
+  // ─── Identification poseur ───
+  const [poseurIdentifie, setPoseurIdentifie] = useState(null)
 
   const devis = useDevisStore(s => s.getDevisById(devisId))
   const {
     getChantier, initChantier, pointerArrivee, pointerDepart,
     validerEtape, devaliderEtape, ajouterPhoto, supprimerPhoto,
-    ajouterSPANC, setNotes, getProgression, getPhotosEtape
+    ajouterSPANC, ajouterSignature, setNotes, getProgression, getPhotosEtape
   } = useChantierStore()
 
   const chantier = useChantierStore(s => s.chantiers[devisId])
+
+  const [isOnline, setIsOnline] = useState(navigator.onLine)
+  
+  useEffect(() => {
+    const goOnline = () => setIsOnline(true)
+    const goOffline = () => setIsOnline(false)
+    window.addEventListener('online', goOnline)
+    window.addEventListener('offline', goOffline)
+    return () => {
+      window.removeEventListener('online', goOnline)
+      window.removeEventListener('offline', goOffline)
+    }
+  }, [])
+
+  const poseurNom = poseurIdentifie?.nom || 'Poseur'
 
   // Calculer la progression de façon réactive
   const progression = useMemo(() => {
     if (!chantier) return { total: 0, fait: 0, pct: 0 }
     const totalEtapes = PROCEDURE_ANC.reduce((acc, phase) => acc + phase.etapes.length, 0)
     const etapesFaites = Object.values(chantier.etapes || {}).filter(e => e.fait).length
-    const photosDone = PROCEDURE_ANC.flatMap(p => p.etapes).filter(e => e.type === 'photo' && (chantier.photos || []).some(p => p.etapeId === e.id)).length
-    const fait = Math.max(etapesFaites, etapesFaites) // photos counted via etapes.fait
     return { total: totalEtapes, fait: etapesFaites, pct: Math.round((etapesFaites / totalEtapes) * 100) }
   }, [chantier])
 
   // ─── Init chantier au premier accès ───
   useEffect(() => {
-    if (devisId && !chantier) {
+    if (devisId && !chantier && poseurIdentifie) {
       initChantier(devisId, poseurNom)
     }
-  }, [devisId])
+  }, [devisId, poseurIdentifie])
 
   // ─── State UI ───
   const [phaseOuverte, setPhaseOuverte] = useState(null)
@@ -73,6 +191,7 @@ export default function FichePoseur() {
   const [showDepart, setShowDepart] = useState(false)
   const [showNotes, setShowNotes] = useState(false)
   const [showPhotoView, setShowPhotoView] = useState(null)
+  const [showSignature, setShowSignature] = useState(false)
   const [spancForm, setSpancForm] = useState({ inspecteur: '', conforme: null, commentaire: '' })
   const photoRef = useRef()
   const spancPhotoRef = useRef()
@@ -92,21 +211,41 @@ export default function FichePoseur() {
   const passageEnCours = chantier?.passages?.length > 0 &&
     !chantier.passages[chantier.passages.length - 1].depart
 
-  // ─── Pointer à l'arrivée automatiquement ───
+  // ─── Pointer à l'arrivée automatiquement après identification ───
   useEffect(() => {
-    if (chantier && !passageEnCours && chantier.statut !== 'termine') {
+    if (chantier && poseurIdentifie && !passageEnCours && chantier.statut !== 'termine') {
       pointerArrivee(devisId, poseurNom)
     }
-  }, [devisId, chantier?.statut])
+  }, [devisId, chantier?.statut, poseurIdentifie])
 
-  // ─── Photo capture handler ───
+  // ─── Obtenir la position GPS ───
+  const getPosition = () => {
+    return new Promise((resolve) => {
+      if (!navigator.geolocation) {
+        resolve(null)
+        return
+      }
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude, accuracy: pos.coords.accuracy }),
+        () => resolve(null),
+        { enableHighAccuracy: true, timeout: 5000, maximumAge: 60000 }
+      )
+    })
+  }
+
+  // ─── Photo capture handler avec géolocalisation ───
   const handlePhotoCapture = async (e) => {
     const file = e.target.files?.[0]
     if (!file || !captureEtapeId) return
+    
+    // Récupérer la position GPS en parallèle
+    const geoPromise = getPosition()
+    
     const reader = new FileReader()
     reader.onload = async (ev) => {
       const compressed = await compressImage(ev.target.result)
-      ajouterPhoto(devisId, captureEtapeId, compressed, poseurNom)
+      const geo = await geoPromise
+      ajouterPhoto(devisId, captureEtapeId, compressed, poseurNom, geo)
       setCaptureEtapeId(null)
     }
     reader.readAsDataURL(file)
@@ -169,6 +308,11 @@ export default function FichePoseur() {
     )
   }
 
+  // ─── Écran identification PIN ───
+  if (!poseurIdentifie) {
+    return <EcranPIN devis={devis} onIdentifie={setPoseurIdentifie} />
+  }
+
   if (!chantier) return null
 
   const totalPhotos = chantier.photos?.length || 0
@@ -184,6 +328,11 @@ export default function FichePoseur() {
               <p className="text-[10px] text-gray-500">{devis.client?.adresse || ''} • {devis.numeroDevis}</p>
             </div>
             <div className="flex items-center space-x-2">
+              {!isOnline && (
+                <span className="text-[9px] px-2 py-1 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">
+                  📴 Hors-ligne
+                </span>
+              )}
               <span className="text-[10px] px-2 py-1 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
                 👷 {poseurNom}
               </span>
@@ -272,13 +421,12 @@ export default function FichePoseur() {
                             <button
                               onClick={() => {
                                 if (!fait) {
-                                  validerEtape(devisId, etape.id, poseurNom)
-                                  handleDepart('termine')
+                                  setShowSignature(true)
                                 }
                               }}
                               className={`w-10 h-10 rounded-lg flex items-center justify-center shrink-0 ${fait ? 'bg-emerald-500/20 text-emerald-400' : 'bg-amber-500/10 text-amber-400 border border-amber-500/30'}`}
                             >
-                              {fait ? <CheckCircle size={20} /> : <Check size={20} />}
+                              {fait ? <CheckCircle size={20} /> : <Pen size={20} />}
                             </button>
                           ) : (
                             <button
@@ -331,6 +479,7 @@ export default function FichePoseur() {
                                   <X size={10} />
                                 </button>
                                 <p className="text-[7px] text-gray-600 text-center mt-0.5">{fmtHeure(photo.timestamp)}</p>
+                                {photo.geo && <p className="text-[6px] text-emerald-600 text-center">📍 GPS</p>}
                               </div>
                             ))}
                             {isPhotoStep && (
@@ -576,6 +725,45 @@ export default function FichePoseur() {
         </div>
       )}
 
+      {/* ─── MODAL SIGNATURE ─── */}
+      {showSignature && (
+        <SignaturePad
+          titre="Signature fin de chantier"
+          sousTitre={`${devis.client?.nom || 'Client'} — ${devis.numeroDevis}`}
+          onClose={() => setShowSignature(false)}
+          onSave={(signatureData) => {
+            ajouterSignature(devisId, signatureData)
+            validerEtape(devisId, 'fin_signature', poseurNom)
+            setShowSignature(false)
+          }}
+        />
+      )}
+
+      {/* ─── SIGNATURES ENREGISTRÉES ─── */}
+      {chantier.signatures?.length > 0 && (
+        <div className="px-3">
+          <div className="rounded-xl border border-emerald-500/20 bg-emerald-500/5 p-4 mt-2">
+            <p className="text-xs font-bold text-emerald-400 mb-2">✍️ Signatures</p>
+            {chantier.signatures.map((sig, i) => (
+              <div key={i} className="py-2 border-b border-emerald-500/10 last:border-0">
+                <div className="flex items-center justify-between">
+                  <span className="text-[10px] text-white font-medium">{sig.signataire}</span>
+                  <span className="text-[10px] text-gray-400">
+                    {sig.fonction === 'client' ? '👤 Client' : sig.fonction === 'poseur' ? '👷 Poseur' : '👔 Responsable'}
+                  </span>
+                </div>
+                <p className="text-[9px] text-gray-500">{fmtDate(sig.timestamp)}</p>
+                {sig.signatureImage && (
+                  <div className="mt-2 bg-white/5 rounded-lg p-2 inline-block">
+                    <img src={sig.signatureImage} alt="Signature" className="h-16 object-contain" />
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* ─── MODAL PHOTO PLEIN ÉCRAN ─── */}
       {showPhotoView && (
         <div className="fixed inset-0 z-50 bg-black flex items-center justify-center" onClick={() => setShowPhotoView(null)}>
@@ -585,6 +773,12 @@ export default function FichePoseur() {
           <img src={showPhotoView.dataUrl} alt="" className="max-w-full max-h-full object-contain" />
           <div className="absolute bottom-4 left-4 right-4 text-center">
             <p className="text-xs text-gray-400">{showPhotoView.poseur} — {fmtDate(showPhotoView.timestamp)}</p>
+            {showPhotoView.geo && (
+              <p className="text-[10px] text-emerald-400 mt-1">
+                📍 {showPhotoView.geo.lat.toFixed(6)}, {showPhotoView.geo.lng.toFixed(6)}
+                {showPhotoView.geo.accuracy && <span className="text-gray-500"> (±{Math.round(showPhotoView.geo.accuracy)}m)</span>}
+              </p>
+            )}
           </div>
         </div>
       )}

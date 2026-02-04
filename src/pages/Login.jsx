@@ -1,10 +1,140 @@
-import { useState } from 'react'
+import { useState, useRef, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
-import { ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { ArrowRight, Eye, EyeOff, Shield, Lock, AlertTriangle } from 'lucide-react'
 import Window from '../components/Window'
 
-export default function Login() {
+// ─── Code d'accès entreprise par défaut ───
+const CODE_ENTREPRISE_DEFAULT = 'FARB2025'
+
+// ─── Écran 1 : Code Entreprise (premier verrou) ───
+function EcranCodeEntreprise({ onSuccess }) {
+  const [code, setCode] = useState('')
+  const [error, setError] = useState('')
+  const [tentatives, setTentatives] = useState(0)
+  const [bloque, setBloque] = useState(false)
+  const [tempsRestant, setTempsRestant] = useState(0)
+  const inputRef = useRef(null)
+
+  useEffect(() => {
+    inputRef.current?.focus()
+  }, [])
+
+  // Blocage temporaire après 5 tentatives
+  useEffect(() => {
+    if (tempsRestant > 0) {
+      const timer = setTimeout(() => setTempsRestant(t => t - 1), 1000)
+      return () => clearTimeout(timer)
+    } else if (bloque) {
+      setBloque(false)
+    }
+  }, [tempsRestant, bloque])
+
+  const handleSubmit = (e) => {
+    e.preventDefault()
+    if (bloque) return
+
+    // Vérifier le code (celui par défaut ou celui personnalisé par l'admin)
+    const storedCode = localStorage.getItem('farbrum-code-entreprise')
+    const validCode = storedCode || CODE_ENTREPRISE_DEFAULT
+
+    if (code.toUpperCase().trim() === validCode.toUpperCase()) {
+      sessionStorage.setItem('farbrum-access', 'granted')
+      onSuccess()
+    } else {
+      const newTentatives = tentatives + 1
+      setTentatives(newTentatives)
+      setError('Code incorrect')
+      setCode('')
+
+      if (newTentatives >= 5) {
+        const blocDuree = Math.min(newTentatives * 10, 120)
+        setBloque(true)
+        setTempsRestant(blocDuree)
+        setError(`Trop de tentatives. Réessayez dans ${blocDuree}s.`)
+      }
+    }
+  }
+
+  return (
+    <div className="min-h-screen bg-bg flex items-center justify-center p-4">
+      <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose/5 rounded-full blur-[150px] pointer-events-none" />
+
+      <div className="w-full max-w-sm relative z-10">
+        {/* Logo */}
+        <div className="text-center mb-8">
+          <img src="/logo.jpg" alt="F.Arbrum" className="w-20 h-20 mx-auto rounded-xl border-2 border-rose/30 shadow-[0_0_30px_rgba(200,80,155,0.2)] object-cover mb-4" />
+          <h1 className="font-display text-2xl font-extrabold text-white">F.Arbrum</h1>
+          <p className="text-xs text-gray-500 mt-1">Espace réservé</p>
+        </div>
+
+        <Window title="Accès sécurisé" icon={Shield}>
+          <div className="p-5">
+            <div className="text-center mb-5">
+              <div className="w-16 h-16 mx-auto rounded-2xl bg-rose/10 border border-rose/20 flex items-center justify-center mb-3">
+                <Lock className="w-8 h-8 text-rose" />
+              </div>
+              <p className="text-xs text-gray-400">Entrez le code d'accès entreprise</p>
+            </div>
+
+            {error && (
+              <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400 flex items-center space-x-2">
+                <AlertTriangle size={14} />
+                <span>{error}</span>
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <input
+                ref={inputRef}
+                type="password"
+                value={code}
+                onChange={e => { setCode(e.target.value); setError('') }}
+                className="w-full h-14 px-4 bg-bg-input border border-white/10 rounded-xl text-xl text-white text-center tracking-[0.5em] font-mono placeholder:text-gray-700 placeholder:tracking-normal placeholder:text-sm focus:outline-none focus:ring-2 focus:ring-rose/40 focus:border-rose transition-all"
+                placeholder="• • • • • • • •"
+                disabled={bloque}
+                autoComplete="off"
+                required
+              />
+
+              <button
+                type="submit"
+                disabled={bloque || !code.trim()}
+                className={`w-full h-11 font-semibold rounded-xl text-sm transition-all flex items-center justify-center space-x-2 ${
+                  bloque || !code.trim()
+                    ? 'bg-white/5 text-gray-600 cursor-not-allowed'
+                    : 'bg-rose hover:bg-rose-light text-white shadow-[0_0_20px_rgba(200,80,155,0.3)]'
+                }`}
+              >
+                {bloque ? (
+                  <span>⏳ Bloqué ({tempsRestant}s)</span>
+                ) : (
+                  <>
+                    <Shield className="w-4 h-4" />
+                    <span>Accéder</span>
+                  </>
+                )}
+              </button>
+            </form>
+
+            {tentatives > 0 && tentatives < 5 && (
+              <p className="text-[9px] text-gray-600 text-center mt-3">
+                {5 - tentatives} tentative{5 - tentatives > 1 ? 's' : ''} restante{5 - tentatives > 1 ? 's' : ''} avant blocage
+              </p>
+            )}
+          </div>
+        </Window>
+
+        <p className="text-[9px] text-gray-700 text-center mt-4">
+          Accès non autorisé interdit. Toute tentative est enregistrée.
+        </p>
+      </div>
+    </div>
+  )
+}
+
+// ─── Écran 2 : Login classique (email + mot de passe) ───
+function EcranLogin() {
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
   const [error, setError] = useState('')
@@ -18,24 +148,24 @@ export default function Login() {
     user ? navigate('/') : setError('Email ou mot de passe incorrect')
   }
 
-  const fillDemo = (t) => { setEmail(t==='admin'?'admin@test.com':'ouvrier@test.com'); setPassword('password'); setError('') }
-
   const inp = "w-full h-10 px-3 bg-bg-input border border-white/10 rounded text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-rose/40 focus:border-rose transition-all"
 
   return (
     <div className="min-h-screen bg-bg flex items-center justify-center p-4">
-      {/* Background glow */}
       <div className="fixed top-1/3 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[500px] h-[500px] bg-rose/5 rounded-full blur-[150px] pointer-events-none" />
 
       <div className="w-full max-w-md relative z-10">
-        {/* Logo */}
         <div className="text-center mb-8">
-          <img src="/logo.jpg" alt="F.Arbrum" className="w-24 h-24 mx-auto rounded-xl border-2 border-rose/30 shadow-[0_0_30px_rgba(200,80,155,0.2)] object-cover mb-4" />
+          <img src="/logo.jpg" alt="F.Arbrum" className="w-24 h-24 mx-auto rounded-xl border-2 border-emerald-500/30 shadow-[0_0_30px_rgba(16,185,129,0.15)] object-cover mb-4" />
           <h1 className="font-display text-3xl font-extrabold text-white">F.Arbrum</h1>
           <p className="text-sm text-gray-500 mt-1">Gestion de devis d'assainissement</p>
+          <div className="flex items-center justify-center space-x-1 mt-2">
+            <Shield size={12} className="text-emerald-400" />
+            <span className="text-[10px] text-emerald-400">Accès vérifié</span>
+          </div>
         </div>
 
-        <Window title="Connexion">
+        <Window title="Identification">
           <div className="p-5">
             {error && <div className="mb-4 px-3 py-2 bg-red-500/10 border border-red-500/30 rounded text-sm text-red-400">{error}</div>}
 
@@ -57,23 +187,22 @@ export default function Login() {
                 <span>Se connecter</span><ArrowRight className="w-4 h-4" />
               </button>
             </form>
-
-            <div className="mt-5 pt-4 border-t border-white/5">
-              <p className="text-[10px] font-semibold text-gray-600 uppercase tracking-wider mb-2">Démo</p>
-              <div className="grid grid-cols-2 gap-2">
-                <button onClick={()=>fillDemo('admin')} className="px-3 py-2 bg-bg-input border border-white/5 hover:border-rose/40 rounded transition-all text-left">
-                  <p className="text-[11px] font-semibold text-gray-300">👑 Admin</p>
-                  <p className="text-[9px] text-gray-600">Accès complet</p>
-                </button>
-                <button onClick={()=>fillDemo('ouvrier')} className="px-3 py-2 bg-bg-input border border-white/5 hover:border-rose/40 rounded transition-all text-left">
-                  <p className="text-[11px] font-semibold text-gray-300">🔧 Ouvrier</p>
-                  <p className="text-[9px] text-gray-600">Consultation</p>
-                </button>
-              </div>
-            </div>
           </div>
         </Window>
       </div>
     </div>
   )
+}
+
+// ─── Page Login principale — gère les 2 écrans ───
+export default function Login() {
+  const [codeValide, setCodeValide] = useState(
+    () => sessionStorage.getItem('farbrum-access') === 'granted'
+  )
+
+  if (!codeValide) {
+    return <EcranCodeEntreprise onSuccess={() => setCodeValide(true)} />
+  }
+
+  return <EcranLogin />
 }

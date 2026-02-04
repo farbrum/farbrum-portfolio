@@ -16,7 +16,7 @@ export default function Administration() {
     const data = {
       _export: {
         app: 'F.Arbrum',
-        version: '5L',
+        version: '6',
         date: new Date().toISOString(),
       },
       categories: useProductStore.getState().categories,
@@ -34,10 +34,18 @@ export default function Administration() {
     const url = URL.createObjectURL(blob)
     const a = document.createElement('a')
     const d = new Date()
+    const filename = `F_Arbrum_backup_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.json`
     a.href = url
-    a.download = `F_Arbrum_backup_${d.getFullYear()}${String(d.getMonth()+1).padStart(2,'0')}${String(d.getDate()).padStart(2,'0')}_${String(d.getHours()).padStart(2,'0')}${String(d.getMinutes()).padStart(2,'0')}.json`
+    a.download = filename
+    // Fix pour iOS Safari et navigateurs mobiles
+    a.style.display = 'none'
+    document.body.appendChild(a)
     a.click()
-    URL.revokeObjectURL(url)
+    // Nettoyer après un délai (important pour mobile)
+    setTimeout(() => {
+      document.body.removeChild(a)
+      URL.revokeObjectURL(url)
+    }, 1000)
     setMsg({ type: 'ok', text: `Export réussi ! ${data.produits.length} produits, ${data.devis.length} devis, ${data.fournisseurs.length} fournisseurs.` })
     setTimeout(() => setMsg(null), 5000)
   }
@@ -339,6 +347,48 @@ export default function Administration() {
             </div>
           </Window>
         </div>
+
+        {/* SÉCURITÉ — Code entreprise & identifiants */}
+        <Window title="Sécurité & Accès" icon={Shield}>
+          <div className="p-5 space-y-4">
+            {/* Code entreprise */}
+            <div>
+              <label className="text-[10px] text-gray-500 uppercase font-semibold mb-1 block">Code d'accès entreprise (1er verrou)</label>
+              <div className="flex items-center space-x-2">
+                <input
+                  type="text"
+                  defaultValue={localStorage.getItem('farbrum-code-entreprise') || 'FARB2025'}
+                  id="codeEntreprise"
+                  className="flex-1 h-8 px-3 bg-bg-input border border-white/10 rounded text-sm text-white font-mono uppercase"
+                />
+                <button
+                  onClick={() => {
+                    const val = document.getElementById('codeEntreprise').value.trim()
+                    if (val.length < 4) { setMsg({type:'err',text:'Le code doit faire au moins 4 caractères'}); return }
+                    localStorage.setItem('farbrum-code-entreprise', val.toUpperCase())
+                    setMsg({type:'ok',text:'Code entreprise mis à jour !'})
+                    setTimeout(() => setMsg(null), 3000)
+                  }}
+                  className="h-8 px-4 bg-rose/10 hover:bg-rose/20 text-rose text-xs font-semibold rounded border border-rose/25"
+                >
+                  Modifier
+                </button>
+              </div>
+              <p className="text-[8px] text-gray-600 mt-1">Ce code est demandé à tous les utilisateurs avant l'écran de connexion. Partagez-le uniquement avec vos collaborateurs.</p>
+            </div>
+
+            <div className="border-t border-white/5" />
+
+            {/* Info poseur */}
+            <div>
+              <p className="text-[10px] text-gray-500 uppercase font-semibold mb-1">Accès poseur</p>
+              <div className="bg-emerald-500/5 border border-emerald-500/15 rounded p-3">
+                <p className="text-xs text-emerald-400 font-medium">🔒 Accès QR Code + PIN uniquement</p>
+                <p className="text-[9px] text-gray-400 mt-1">Les poseurs n'accèdent qu'à leur fiche chantier via le QR code. Ils ne peuvent pas voir les devis, produits ou paramètres.</p>
+              </div>
+            </div>
+          </div>
+        </Window>
 
         {/* VERSION */}
         <Window title="Version" icon={Settings}>

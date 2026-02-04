@@ -7,6 +7,8 @@ import { Users, Plus, Trash2, Edit3, Calendar, Save, X, AlertTriangle, ChevronLe
 const inp = "w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-rose/30 focus:border-rose transition-all"
 const lbl = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1"
 const COMPETENCES = ['excavation','transport','pose','tuyauterie','collage','remblai','livraison']
+const JOURS_SEMAINE = [{id:1,court:'Lun',nom:'Lundi'},{id:2,court:'Mar',nom:'Mardi'},{id:3,court:'Mer',nom:'Mercredi'},{id:4,court:'Jeu',nom:'Jeudi'},{id:5,court:'Ven',nom:'Vendredi'},{id:6,court:'Sam',nom:'Samedi'},{id:0,court:'Dim',nom:'Dimanche'}]
+const ROLES = [{id:'pelleur',nom:'Pelleur / Conducteur engin',icon:'🚜',color:'text-amber-400'},{id:'chauffeur',nom:'Chauffeur PL / Tracteur',icon:'🚛',color:'text-blue-400'},{id:'poseur',nom:'Poseur / Tuyauteur',icon:'🔧',color:'text-emerald-400'},{id:'chef',nom:'Chef de chantier',icon:'👷',color:'text-rose'},{id:'manoeuvre',nom:'Manœuvre',icon:'🧤',color:'text-gray-300'}]
 const NOMS_MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 
 function getJoursFeries(annee) {
@@ -25,7 +27,7 @@ function getJoursFeries(annee) {
 }
 const JOURS_COURT = ['Lu','Ma','Me','Je','Ve','Sa','Di']
 
-function AgendaCalendar({ indisponibilites = [], reservations = [], onToggle }) {
+function AgendaCalendar({ indisponibilites = [], reservations = [], joursTravail = [1,2,3,4,5], vacances = [], onToggle }) {
   const now = new Date()
   const [mois, setMois] = useState(now.getMonth())
   const [annee, setAnnee] = useState(now.getFullYear())
@@ -36,6 +38,7 @@ function AgendaCalendar({ indisponibilites = [], reservations = [], onToggle }) 
   const nbDays = new Date(annee, mois + 1, 0).getDate()
   const offset = firstDay === 0 ? 6 : firstDay - 1
   const todayStr = new Date().toISOString().split('T')[0]
+  const isEnVacances = (ds) => vacances.some(v => ds >= v.debut && ds <= v.fin)
   const cells = []
   for (let i = 0; i < offset; i++) cells.push(null)
   for (let d = 1; d <= nbDays; d++) cells.push(d)
@@ -53,49 +56,163 @@ function AgendaCalendar({ indisponibilites = [], reservations = [], onToggle }) 
           const dt = new Date(annee, mois, d)
           const ds = dt.toISOString().split('T')[0]
           const dow = dt.getDay()
-          const isDimanche = dow === 0, isSamedi = dow === 6, isFerie = feries.includes(ds)
-          const isToday = ds === todayStr, inList = indisponibilites.includes(ds), isReserved = reservations.includes(ds)
-          const isClosedDefault = isSamedi || isFerie
-          const isIndispo = isClosedDefault ? !inList : inList
-          let bg = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer'
-          if (isDimanche) bg = 'bg-white/5 border-white/10 text-gray-700 cursor-not-allowed'
-          else if (isReserved) bg = 'bg-rose/15 border-rose/25 text-rose cursor-not-allowed'
-          else if (isIndispo) bg = 'bg-red-500/15 border-red-500/20 text-red-400 hover:bg-red-500/25 cursor-pointer'
-          return (<button key={i} disabled={isDimanche||isReserved} onClick={()=>!isDimanche&&!isReserved&&onToggle(ds)} className={`h-8 rounded border text-[10px] font-bold flex items-center justify-center transition-all ${bg} ${isToday?'ring-1 ring-white/30':''}`}>{d}</button>)
+          const isJourOff = !joursTravail.includes(dow) // jour non travaillé selon profil
+          const isFerie = feries.includes(ds)
+          const isVacance = isEnVacances(ds)
+          const isToday = ds === todayStr
+          const inList = indisponibilites.includes(ds)
+          const isReserved = reservations.includes(ds)
+
+          let bg, disabled = false
+          if (isJourOff) {
+            bg = 'bg-white/5 border-white/10 text-gray-700 cursor-not-allowed'
+            disabled = true
+          } else if (isVacance) {
+            bg = 'bg-amber-500/15 border-amber-500/20 text-amber-400 cursor-not-allowed'
+            disabled = true
+          } else if (isReserved) {
+            bg = 'bg-rose/15 border-rose/25 text-rose cursor-not-allowed'
+            disabled = true
+          } else if (isFerie || inList) {
+            bg = 'bg-red-500/15 border-red-500/20 text-red-400 hover:bg-red-500/25 cursor-pointer'
+          } else {
+            bg = 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 cursor-pointer'
+          }
+          return (<button key={i} disabled={disabled} onClick={()=>!disabled&&onToggle(ds)} className={`h-8 rounded border text-[10px] font-bold flex items-center justify-center transition-all ${bg} ${isToday?'ring-1 ring-white/30':''}`}>{d}</button>)
         })}
       </div>
       <div className="flex flex-wrap gap-3 mt-3 justify-center">
         <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-emerald-500/15 border border-emerald-500/20" /><span className="text-[8px] text-gray-500">Disponible</span></div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-500/15 border border-red-500/20" /><span className="text-[8px] text-gray-500">Indispo / Fermé</span></div>
-        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-white/5 border border-white/10" /><span className="text-[8px] text-gray-500">Dimanche</span></div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-red-500/15 border border-red-500/20" /><span className="text-[8px] text-gray-500">Indispo / Férié</span></div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-amber-500/15 border border-amber-500/20" /><span className="text-[8px] text-gray-500">Vacances</span></div>
+        <div className="flex items-center gap-1"><div className="w-3 h-3 rounded bg-white/5 border border-white/10" /><span className="text-[8px] text-gray-500">Jour off</span></div>
       </div>
     </div>
   )
 }
 
 function RessourceForm({ initial, onSave, onCancel }) {
-  const [form, setForm] = useState(initial || { nom:'',role:'pelleur',tarifJournalier:280,tarifHoraire:35,telephone:'',competences:['excavation','pose'] })
+  const defaultForm = { nom:'',roles:['poseur'],pin:'',tarifHoraire:35,tarifJournalier:280,telephone:'',competences:['pose'],joursTravail:[1,2,3,4,5],vacances:[] }
+  // Migration: si initial a un ancien champ 'role' (string), convertir en 'roles' (array)
+  const migratedInitial = initial ? {
+    ...defaultForm,
+    ...initial,
+    roles: initial.roles || (initial.role ? [initial.role] : ['poseur']),
+    joursTravail: initial.joursTravail || [1,2,3,4,5],
+    vacances: initial.vacances || [],
+  } : defaultForm
+
+  const [form, setForm] = useState(migratedInitial)
+  const [showVacances, setShowVacances] = useState(false)
+  const [newVac, setNewVac] = useState({debut:'',fin:'',label:''})
+
   const set = (k,v) => setForm(f=>({...f,[k]:v}))
   const toggleComp = (c) => setForm(f=>({...f,competences:f.competences.includes(c)?f.competences.filter(x=>x!==c):[...f.competences,c]}))
-  const ROLES = [{id:'pelleur',nom:'Pelleur / Conducteur engin'},{id:'chauffeur',nom:'Chauffeur PL / Tracteur'},{id:'poseur',nom:'Poseur / Tuyauteur'},{id:'chef',nom:'Chef de chantier'},{id:'manoeuvre',nom:'Manœuvre'}]
+  const toggleRole = (r) => setForm(f=>({...f,roles:f.roles.includes(r)?f.roles.filter(x=>x!==r):[...f.roles,r]}))
+  const toggleJour = (j) => setForm(f=>({...f,joursTravail:f.joursTravail.includes(j)?f.joursTravail.filter(x=>x!==j):[...f.joursTravail,j]}))
+
+  // Auto-calc tarif
+  const setHoraire = (v) => setForm(f=>({...f,tarifHoraire:v,tarifJournalier:Math.round(v*8*100)/100}))
+  const setJournalier = (v) => setForm(f=>({...f,tarifJournalier:v,tarifHoraire:Math.round(v/8*100)/100}))
+
+  const addVacance = () => {
+    if (!newVac.debut || !newVac.fin) return
+    set('vacances',[...form.vacances,{...newVac,id:Date.now().toString()}])
+    setNewVac({debut:'',fin:'',label:''})
+  }
+  const removeVacance = (id) => set('vacances',form.vacances.filter(v=>v.id!==id))
+
   return (
-    <div className="space-y-3">
-      <div className="grid grid-cols-2 gap-3">
-        <div><label className={lbl}>Nom complet</label><input value={form.nom} onChange={e=>set('nom',e.target.value)} className={inp} placeholder="Ex: Jean Dupont" /></div>
-        <div><label className={lbl}>Rôle</label><select value={form.role} onChange={e=>set('role',e.target.value)} className={inp}>{ROLES.map(r=><option key={r.id} value={r.id}>{r.nom}</option>)}</select></div>
-      </div>
+    <div className="space-y-4">
+      {/* Ligne 1: Nom + PIN + Téléphone */}
       <div className="grid grid-cols-3 gap-3">
-        <div><label className={lbl}>Tarif journalier (€)</label><input type="number" value={form.tarifJournalier} onChange={e=>set('tarifJournalier',parseFloat(e.target.value)||0)} className={inp} /></div>
-        <div><label className={lbl}>Tarif horaire (€)</label><input type="number" value={form.tarifHoraire} onChange={e=>set('tarifHoraire',parseFloat(e.target.value)||0)} className={inp} /></div>
+        <div><label className={lbl}>Nom complet</label><input value={form.nom} onChange={e=>set('nom',e.target.value)} className={inp} placeholder="Ex: Francis Dupont" /></div>
         <div><label className={lbl}>Téléphone</label><input value={form.telephone||''} onChange={e=>set('telephone',e.target.value)} className={inp} placeholder="06..." /></div>
+        <div><label className={lbl}>🔑 Code PIN (4 chiffres)</label><input value={form.pin||''} onChange={e=>{const v=e.target.value.replace(/\D/g,'').slice(0,4);set('pin',v)}} className={inp} placeholder="1234" maxLength={4} style={{letterSpacing:'0.3em',fontFamily:'monospace',fontWeight:'bold'}} /></div>
       </div>
+
+      {/* Rôles (multi-select) */}
+      <div>
+        <label className={lbl}>Rôles (un ou plusieurs)</label>
+        <div className="flex flex-wrap gap-1.5">
+          {ROLES.map(r=>(
+            <button key={r.id} type="button" onClick={()=>toggleRole(r.id)}
+              className={`px-3 py-1.5 rounded text-[10px] font-semibold border transition-all ${form.roles.includes(r.id)?'bg-rose/20 text-rose border-rose/30':'bg-white/5 text-gray-500 border-white/10 hover:border-white/20'}`}>
+              {r.icon} {r.nom}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* Tarifs (auto-calc) */}
+      <div className="grid grid-cols-2 gap-3">
+        <div>
+          <label className={lbl}>Tarif horaire (€/h)</label>
+          <input type="number" step="0.5" value={form.tarifHoraire} onChange={e=>setHoraire(parseFloat(e.target.value)||0)} className={inp} />
+          <p className="text-[8px] text-gray-600 mt-0.5">→ journée 8h = {(form.tarifHoraire*8).toFixed(0)}€</p>
+        </div>
+        <div>
+          <label className={lbl}>Tarif journalier (€/j)</label>
+          <input type="number" step="5" value={form.tarifJournalier} onChange={e=>setJournalier(parseFloat(e.target.value)||0)} className={inp} />
+          <p className="text-[8px] text-gray-600 mt-0.5">→ horaire = {(form.tarifJournalier/8).toFixed(2)}€/h</p>
+        </div>
+      </div>
+
+      {/* Jours travaillés */}
+      <div>
+        <label className={lbl}>Jours travaillés par défaut</label>
+        <div className="flex gap-1.5">
+          {JOURS_SEMAINE.map(j=>(
+            <button key={j.id} type="button" onClick={()=>toggleJour(j.id)}
+              className={`w-12 h-10 rounded-lg text-[10px] font-bold border transition-all ${form.joursTravail.includes(j.id)?'bg-emerald-500/20 text-emerald-400 border-emerald-500/30':'bg-white/5 text-gray-600 border-white/10 hover:border-white/20'}`}>
+              {j.court}
+            </button>
+          ))}
+        </div>
+        <p className="text-[8px] text-gray-600 mt-1">{form.joursTravail.length} jours/semaine — {(form.joursTravail.length * form.tarifJournalier).toFixed(0)}€/semaine</p>
+      </div>
+
+      {/* Compétences */}
       <div>
         <label className={lbl}>Compétences</label>
-        <div className="flex flex-wrap gap-1.5">{COMPETENCES.map(c=>(<button key={c} type="button" onClick={()=>toggleComp(c)} className={`px-2.5 py-1 rounded text-[10px] font-semibold border transition-all ${form.competences.includes(c)?'bg-rose/20 text-rose border-rose/30':'bg-white/5 text-gray-500 border-white/10 hover:border-white/20'}`}>{c}</button>))}</div>
+        <div className="flex flex-wrap gap-1.5">{COMPETENCES.map(c=>(<button key={c} type="button" onClick={()=>toggleComp(c)} className={`px-2.5 py-1 rounded text-[10px] font-semibold border transition-all ${form.competences.includes(c)?'bg-blue-500/20 text-blue-400 border-blue-500/30':'bg-white/5 text-gray-500 border-white/10 hover:border-white/20'}`}>{c}</button>))}</div>
       </div>
-      <div className="flex items-center justify-end gap-2 pt-2">
+
+      {/* Vacances / Congés */}
+      <div>
+        <div className="flex items-center justify-between">
+          <label className={lbl}>🏖️ Congés / Vacances planifiés</label>
+          <button type="button" onClick={()=>setShowVacances(!showVacances)} className="text-[9px] text-rose hover:text-rose-light">
+            {showVacances ? 'Masquer' : `${form.vacances.length} période${form.vacances.length>1?'s':''} — Gérer`}
+          </button>
+        </div>
+        {showVacances && (
+          <div className="mt-2 space-y-2">
+            {/* Liste existante */}
+            {form.vacances.map(v=>(
+              <div key={v.id} className="flex items-center justify-between bg-white/[0.02] border border-white/10 rounded-lg px-3 py-2">
+                <div>
+                  <span className="text-xs text-white font-medium">{new Date(v.debut).toLocaleDateString('fr-FR')} → {new Date(v.fin).toLocaleDateString('fr-FR')}</span>
+                  {v.label && <span className="text-[10px] text-gray-500 ml-2">({v.label})</span>}
+                </div>
+                <button type="button" onClick={()=>removeVacance(v.id)} className="w-6 h-6 rounded flex items-center justify-center text-red-500/50 hover:text-red-400 hover:bg-red-500/10"><X className="w-3 h-3"/></button>
+              </div>
+            ))}
+            {/* Ajout */}
+            <div className="flex items-end gap-2">
+              <div className="flex-1"><label className="text-[8px] text-gray-600">Du</label><input type="date" value={newVac.debut} onChange={e=>setNewVac(v=>({...v,debut:e.target.value}))} className={inp} /></div>
+              <div className="flex-1"><label className="text-[8px] text-gray-600">Au</label><input type="date" value={newVac.fin} onChange={e=>setNewVac(v=>({...v,fin:e.target.value}))} className={inp} /></div>
+              <div className="flex-1"><label className="text-[8px] text-gray-600">Motif</label><input value={newVac.label} onChange={e=>setNewVac(v=>({...v,label:e.target.value}))} className={inp} placeholder="Vacances été..." /></div>
+              <button type="button" onClick={addVacance} className="h-9 px-3 bg-emerald-500/10 hover:bg-emerald-500/20 border border-emerald-500/20 rounded text-emerald-400 text-xs font-bold shrink-0">+ Ajouter</button>
+            </div>
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="flex items-center justify-end gap-2 pt-2 border-t border-white/5">
         <button type="button" onClick={onCancel} className="h-8 px-4 text-xs text-gray-500 hover:text-white hover:bg-white/5 rounded"><X className="w-3 h-3 inline mr-1"/>Annuler</button>
-        <button type="button" onClick={()=>{if(!form.nom.trim())return alert('Nom requis');onSave(form)}} className="h-8 px-4 bg-rose text-white text-xs font-semibold rounded flex items-center gap-1.5"><Save className="w-3 h-3"/>Enregistrer</button>
+        <button type="button" onClick={()=>{if(!form.nom.trim())return alert('Nom requis');if(form.roles.length===0)return alert('Choisissez au moins un rôle');onSave({...form,role:form.roles[0]})}} className="h-8 px-4 bg-rose text-white text-xs font-semibold rounded flex items-center gap-1.5"><Save className="w-3 h-3"/>Enregistrer</button>
       </div>
     </div>
   )
@@ -103,20 +220,37 @@ function RessourceForm({ initial, onSave, onCancel }) {
 
 function RessourceCard({ressource,onEdit,onDelete,onSelectCalendar,isSelected}) {
   const nbIndispo = (ressource.indisponibilites||[]).length
-  const RL={pelleur:'🚜 Pelleur',chauffeur:'🚛 Chauffeur',poseur:'🔧 Poseur',chef:'👷 Chef',manoeuvre:'🧤 Manœuvre'}
-  const RC={pelleur:'text-amber-400',chauffeur:'text-blue-400',poseur:'text-emerald-400',chef:'text-rose',manoeuvre:'text-gray-300'}
+  const nbVacances = (ressource.vacances||[]).length
+  const roles = ressource.roles || (ressource.role ? [ressource.role] : [])
+  const joursTravail = ressource.joursTravail || [1,2,3,4,5]
+  const joursLabels = {0:'D',1:'L',2:'M',3:'Me',4:'J',5:'V',6:'S'}
+
   return (
     <div className={`border rounded-lg overflow-hidden transition-all ${isSelected?'border-rose/40 bg-rose/5':'border-white/5 bg-bg-card hover:border-white/10'}`}>
       <div className="p-3 flex items-start justify-between">
         <div className="flex-1 min-w-0">
-          <span className={`text-xs font-bold ${RC[ressource.role]||'text-white'}`}>{RL[ressource.role]||ressource.role}</span>
-          <p className="text-sm font-medium text-white truncate mt-0.5">{ressource.nom}</p>
-          <div className="flex items-center gap-3 mt-1.5">
-            <span className="text-[10px] text-gray-500">💰 {ressource.tarifJournalier}€/j</span>
-            <span className="text-[10px] text-gray-500">⏱ {ressource.tarifHoraire}€/h</span>
-            {ressource.telephone&&<span className="text-[10px] text-gray-500">📱 {ressource.telephone}</span>}
+          {/* Rôles (multi) */}
+          <div className="flex flex-wrap gap-1 mb-1">
+            {roles.map(r => {
+              const role = ROLES.find(x=>x.id===r)
+              return <span key={r} className={`text-[9px] font-bold ${role?.color||'text-white'}`}>{role?.icon||''} {role?.nom||r}</span>
+            })}
           </div>
-          <div className="flex flex-wrap gap-1 mt-2">{(ressource.competences||[]).map(c=>(<span key={c} className="px-1.5 py-0.5 bg-white/5 border border-white/10 rounded text-[8px] text-gray-400 font-medium">{c}</span>))}</div>
+          <p className="text-sm font-medium text-white truncate">{ressource.nom}</p>
+          <div className="flex items-center gap-3 mt-1.5">
+            <span className="text-[10px] text-gray-500">💰 {ressource.tarifHoraire}€/h ({ressource.tarifJournalier}€/j)</span>
+            {ressource.telephone&&<span className="text-[10px] text-gray-500">📱 {ressource.telephone}</span>}
+            {ressource.pin&&<span className="text-[10px] text-rose font-mono font-bold">🔑 {ressource.pin}</span>}
+          </div>
+          {/* Jours travaillés */}
+          <div className="flex gap-0.5 mt-2">
+            {JOURS_SEMAINE.map(j=>(
+              <span key={j.id} className={`w-6 h-5 rounded text-[7px] font-bold flex items-center justify-center ${joursTravail.includes(j.id)?'bg-emerald-500/20 text-emerald-400 border border-emerald-500/20':'bg-white/5 text-gray-700 border border-white/5'}`}>{j.court}</span>
+            ))}
+            {nbVacances>0&&<span className="text-[8px] text-amber-400 ml-1.5">🏖️ {nbVacances} congé{nbVacances>1?'s':''}</span>}
+          </div>
+          {/* Compétences */}
+          <div className="flex flex-wrap gap-1 mt-1.5">{(ressource.competences||[]).map(c=>(<span key={c} className="px-1.5 py-0.5 bg-blue-500/5 border border-blue-500/10 rounded text-[8px] text-blue-400/70 font-medium">{c}</span>))}</div>
         </div>
         <div className="flex items-center gap-1 ml-2 shrink-0">
           <button onClick={()=>onSelectCalendar(ressource.id)} className={`w-7 h-7 rounded flex items-center justify-center transition-all ${isSelected?'bg-rose/20 text-rose':'bg-white/5 text-gray-500 hover:text-white hover:bg-white/10'}`}><Calendar className="w-3.5 h-3.5"/></button>
@@ -125,7 +259,7 @@ function RessourceCard({ressource,onEdit,onDelete,onSelectCalendar,isSelected}) 
         </div>
       </div>
       <div className="h-7 bg-black/20 border-t border-white/5 px-3 flex items-center justify-between">
-        <span className="text-[9px] text-gray-600">{nbIndispo>0?`${nbIndispo} jour${nbIndispo>1?'s':''} bloqué${nbIndispo>1?'s':''}`:'\u2705 Aucune indisponibilité'}</span>
+        <span className="text-[9px] text-gray-600">{nbIndispo>0?`${nbIndispo} jour${nbIndispo>1?'s':''} bloqué${nbIndispo>1?'s':''}`:'\u2705 Disponible'}</span>
         {isSelected&&<span className="text-[9px] text-rose font-bold">▼ Agenda ouvert</span>}
       </div>
     </div>
@@ -414,7 +548,7 @@ export default function Ressources() {
             <Window title={`📅 Agenda de ${selectedRess.nom}`}>
               <div className="p-5">
                 <div className="mb-3 p-2.5 bg-rose/5 border border-rose/15 rounded"><p className="text-[10px] text-gray-400">👆 <strong className="text-rose">Cliquez</strong> pour basculer disponible/indisponible.</p></div>
-                <AgendaCalendar indisponibilites={selectedRess.indisponibilites||[]} reservations={[]} onToggle={(ds)=>toggleRessourceIndispo(selectedRess.id,ds)}/>
+                <AgendaCalendar indisponibilites={selectedRess.indisponibilites||[]} reservations={[]} joursTravail={selectedRess.joursTravail||[1,2,3,4,5]} vacances={selectedRess.vacances||[]} onToggle={(ds)=>toggleRessourceIndispo(selectedRess.id,ds)}/>
                 {(selectedRess.indisponibilites||[]).length>0&&(
                   <div className="mt-3 p-2.5 bg-red-500/5 border border-red-500/15 rounded">
                     <p className="text-[10px] text-gray-400 mb-1">🔴 Jours indisponibles :</p>
