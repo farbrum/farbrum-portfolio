@@ -1,5 +1,5 @@
 import { create } from 'zustand'
-
+import { persist } from 'zustand/middleware'
 import { storage } from '../services/supabase'
 
 // ═══════════════════════════════════════════════════════════
@@ -130,7 +130,9 @@ export const PROCEDURE_ANC = [
 // STORE — Chantiers avec photos sur Supabase Storage
 // ═══════════════════════════════════════════════════════════
 
-export const useChantierStore = create((set, get) => ({
+export const useChantierStore = create(
+  persist(
+    (set, get) => ({
       chantiers: {},
 
       // ─── Initialiser un chantier ───
@@ -335,4 +337,7 @@ export const useChantierStore = create((set, get) => ({
         delete chantiers[devisId]
         return { chantiers }
       }),
-}))
+    }),
+    { name: 'chantier-storage' }
+  )
+)
