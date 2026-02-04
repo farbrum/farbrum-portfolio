@@ -137,6 +137,15 @@ function genScenario(doc, devis, scenarioIdx, isFirst) {
   if(devis.nbRehausses>0)y=tl(doc,y,'Rehausses :',`${devis.nbRehausses} × ${fmt(devis.prixRehausse||0)}`)
   if(devis.deconstruction)y=tl(doc,y,'Déconstruction :',`${devis.volumeDeconstruction?.toFixed(1)} m³`)
 
+  // Blocs à bancher
+  if(devis.blocsABancher && (devis.blocsABancher.nbDroits>0 || devis.blocsABancher.nbAngles>0)){
+    const bb = devis.blocsABancher
+    const parts = []
+    if(bb.nbDroits>0) parts.push(`${bb.nbDroits} droits`)
+    if(bb.nbAngles>0) parts.push(`${bb.nbAngles} angles`)
+    y=tl(doc,y,'Blocs a bancher :',parts.join(' + ')+` = ${bb.nbTotal||bb.nbDroits+bb.nbAngles} blocs`)
+  }
+
   // Épandage
   if(devis.epandage){
     y+=2;y=secH(doc,y,'ÉPANDAGE (DT 64.1)')
@@ -200,6 +209,11 @@ function genScenario(doc, devis, scenarioIdx, isFirst) {
   }
   if(devis.nbCoudesPVC>0)fr2.push({_cells:[`Coudes PVC ×${devis.nbCoudesPVC}`,fmt(devis.nbCoudesPVC*(devis.prixCoudePVC||0))]})
   if(devis.nbRehausses>0)fr2.push({_cells:[`Rehausses ×${devis.nbRehausses}`,fmt(devis.nbRehausses*(devis.prixRehausse||0))]})
+  // Blocs à bancher
+  if(devis.blocsABancher?.coutTotal>0){
+    const bb=devis.blocsABancher
+    fr2.push({_cells:[`Blocs a bancher (${bb.nbTotal||0})`,fmt(bb.coutTotal)]})
+  }
   if(devis.posteRelevage&&devis.coutLigneElec>0)fr2.push({_cells:[`Ligne élec ${devis.sectionCable||4}mm² (${devis.longueurCableElec||'?'}ml) + fourreau`,fmt(devis.coutLigneElec)]})
   if(devis.epandage&&sc.coutEpandage>0)fr2.push({_cells:['Épandage (gravier + drains)',fmt(sc.coutEpandage)]})
   if(devis.restaurationSurface&&devis.coutTerreVegetale>0)fr2.push({_cells:['Restauration surface (terre + graine)',fmt(devis.coutTerreVegetale)]})
@@ -390,10 +404,22 @@ function genFicheTechnique(doc, devis) {
 
   // Fournitures associées
   if(devis.produitsAssocies?.length>0){
-    y+=2;y=secH(doc,y,'FOURNITURES ASSOCIÉES')
+    y+=2;y=secH(doc,y,'FOURNITURES ASSOCIEES')
     const faRows = [{_header:true,_cells:['Fourniture','Inclus']}]
-    devis.produitsAssocies.forEach(p=>faRows.push({_cells:[p,'✓']}))
+    devis.produitsAssocies.forEach(p=>faRows.push({_cells:[p,'Oui']}))
     y=drawTable(doc,14,y,[150,30],faRows)
+  }
+
+  // Blocs à bancher
+  if(devis.blocsABancher && (devis.blocsABancher.nbDroits>0 || devis.blocsABancher.nbAngles>0)){
+    y+=2;y=secH(doc,y,'BLOCS A BANCHER')
+    const bb = devis.blocsABancher
+    const bbRows = [{_header:true,_cells:['Element','Quantite']}]
+    if(bb.nbDroits>0) bbRows.push({_cells:[`Blocs droits${bb.dimDroits?' ('+bb.dimDroits+')':''}`,`${bb.nbDroits}`]})
+    if(bb.nbAngles>0) bbRows.push({_cells:[`Blocs angles${bb.dimAngles?' ('+bb.dimAngles+')':''}`,`${bb.nbAngles}`]})
+    if(bb.nbTotal>0) bbRows.push({_footer:true,_bold:true,_cells:['Total blocs',`${bb.nbTotal}`]})
+    if(bb.notes) bbRows.push({_cells:['Note',bb.notes]})
+    y=drawTable(doc,14,y,[130,50],bbRows)
   }
 }
 
@@ -511,32 +537,64 @@ function genCGV(doc) {
 
 // ===== FICHE POSEUR (PDF séparé avec QR + procédure) =====
 function genFichePoseur(doc, devis, qrDataUrl) {
-  doc.addPage(); drawBorder(doc)
+  // NOTE: on écrit directement sur la page 1 (déjà créée par new jsPDF)
+  drawBorder(doc)
   let y = 12
 
+  // ── EN-TÊTE AMÉLIORÉ : nom client gros + adresse + GPS ──
   try{doc.addImage(LOGO_B64,'PNG',14,y,25,19)}catch(e){}
   doc.setFontSize(14);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
   doc.text('DOSSIER INSTALLATEUR',45,y+8)
   doc.setFontSize(9);doc.setTextColor(100,100,100);doc.setFont(undefined,'normal')
-  doc.text(`Devis N° ${devis.numeroDevis||''} — ${devis.client?.nomComplet||''}`,45,y+14)
+  doc.text(`Devis N\u00b0 ${devis.numeroDevis||''}`,45,y+14)
   y+=25; doc.setDrawColor(...ROSE);doc.setLineWidth(0.5);doc.line(12,y,198,y); y+=6
 
+  // Bloc client bien visible pour le poseur
+  const clientNom = devis.client?.nomComplet || ''
+  const clientAdresse = `${devis.client?.adresse||''}, ${devis.client?.codePostal||''} ${devis.client?.ville||''}`.trim()
+  const clientTel = devis.client?.telephone || ''
+  const gpsLat = devis.gpsAnc?.lat || devis.gpsAncLat || null
+  const gpsLng = devis.gpsAnc?.lng || devis.gpsAncLng || null
+
+  // Calcul hauteur du bloc client
+  let blocH = 28
+  if(gpsLat) blocH += 5
+  doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,blocH,3,3,'F')
+  doc.setDrawColor(...ROSE);doc.setLineWidth(0.4);doc.roundedRect(12,y,186,blocH,3,3)
+  // Nom client en gros
+  doc.setFontSize(16);doc.setFont(undefined,'bold');doc.setTextColor(40,40,40)
+  doc.text(clientNom,105,y+8,{align:'center'})
+  // Adresse
+  doc.setFontSize(10);doc.setFont(undefined,'normal');doc.setTextColor(80,80,80)
+  doc.text(clientAdresse,105,y+15,{align:'center'})
+  // Téléphone
+  if(clientTel){
+    doc.setFontSize(9);doc.setTextColor(100,100,100)
+    doc.text(`Tel: ${clientTel}`,105,y+21,{align:'center'})
+  }
+  // Coordonnées GPS
+  if(gpsLat){
+    doc.setFontSize(8);doc.setFont(undefined,'italic');doc.setTextColor(...ROSE)
+    doc.text(`GPS: ${Number(gpsLat).toFixed(5)}, ${Number(gpsLng).toFixed(5)}`,105,y+blocH-3,{align:'center'})
+  }
+  y+=blocH+4
+
   // Procédure de connexion
-  y=secH(doc,y,'PROCÉDURE D\'ACCÈS AU DOSSIER TECHNIQUE')
+  y=secH(doc,y,'PROCEDURE D\'ACCES AU DOSSIER TECHNIQUE')
   doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,38,2,2,'F')
   doc.setDrawColor(...ROSE);doc.setLineWidth(0.3);doc.roundedRect(12,y,186,38,2,2)
   y+=4
   doc.setFontSize(8.5);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
-  doc.text('📱 Pour accéder à votre dossier technique en ligne :',16,y);y+=5
+  doc.text('[Tel] Pour acceder a votre dossier technique en ligne :',16,y);y+=5
   doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(50,50,50)
   const steps = [
-    '1. Scannez le QR code ci-dessous avec votre téléphone',
+    '1. Scannez le QR code ci-dessous avec votre telephone',
     '   OU rendez-vous sur : ' + (typeof window !== 'undefined' ? window.location.origin : 'https://app.farbrum.fr') + '/chantier/' + devis.id,
     '2. Entrez votre code PIN personnel (fourni par l\'administrateur)',
-    '3. Vous accédez à la fiche de suivi du chantier avec :',
-    '   — Les étapes de pose à suivre dans l\'ordre',
-    '   — La prise de photos obligatoire à chaque étape',
-    '   — Les détails techniques (volumes, distances, matériaux)',
+    '3. Vous accedez a la fiche de suivi du chantier avec :',
+    '   -- Les etapes de pose a suivre dans l\'ordre',
+    '   -- La prise de photos obligatoire a chaque etape',
+    '   -- Les details techniques (volumes, distances, materiaux)',
   ]
   steps.forEach(s=>{doc.text(s,16,y);y+=3.5})
   y+=4
@@ -545,11 +603,11 @@ function genFichePoseur(doc, devis, qrDataUrl) {
   if(qrDataUrl){
     y=ck(doc,y,55)
     doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
-    doc.text('QR CODE — ACCÈS CHANTIER',105,y,{align:'center'});y+=4
+    doc.text('QR CODE -- ACCES CHANTIER',105,y,{align:'center'});y+=4
     try{doc.addImage(qrDataUrl,'PNG',72,y,66,66)}catch(e){}
     y+=70
     doc.setFontSize(7);doc.setTextColor(120,120,120);doc.setFont(undefined,'italic')
-    doc.text('Scannez ce QR code pour accéder au dossier technique en ligne.',105,y,{align:'center'});y+=5
+    doc.text('Scannez ce QR code pour acceder au dossier technique en ligne.',105,y,{align:'center'});y+=5
   }
 
   // Puis on insère la fiche technique chantier complète

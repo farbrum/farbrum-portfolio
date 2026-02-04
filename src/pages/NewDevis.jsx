@@ -60,6 +60,8 @@ export default function NewDevis() {
     typeRejet:'infiltration',
     posteRelevage:false,longueurCableElec:'',sectionCable:'4',
     nbRehausses:'0',prixRehausse:'35',
+    // Blocs à bancher
+    blocsNbDroits:'',blocsNbAngles:'',blocsDimDroits:'20×20×50',blocsDimAngles:'20×20×50',blocsPrixDroit:'',blocsPrixAngle:'',blocsNotes:'',
     restaurationSurface:false,restaurationDetails:'',
     terreVegetaleM3:'',prixTerreVegetaleM3:'25',
     notesInstallateur:'',
@@ -92,6 +94,7 @@ export default function NewDevis() {
       typeRejet:d.typeRejet||'infiltration',
       posteRelevage:d.posteRelevage||false,longueurCableElec:d.longueurCableElec?String(d.longueurCableElec):'',sectionCable:d.sectionCable||'4',
       nbRehausses:d.nbRehausses?String(d.nbRehausses):'0',prixRehausse:d.prixRehausse?String(d.prixRehausse):'35',
+      blocsNbDroits:d.blocsABancher?.nbDroits?String(d.blocsABancher.nbDroits):'',blocsNbAngles:d.blocsABancher?.nbAngles?String(d.blocsABancher.nbAngles):'',blocsDimDroits:d.blocsABancher?.dimDroits||'20×20×50',blocsDimAngles:d.blocsABancher?.dimAngles||'20×20×50',blocsPrixDroit:d.blocsABancher?.prixDroit?String(d.blocsABancher.prixDroit):'',blocsPrixAngle:d.blocsABancher?.prixAngle?String(d.blocsABancher.prixAngle):'',blocsNotes:d.blocsABancher?.notes||'',
       restaurationSurface:d.restaurationSurface||false,restaurationDetails:d.restaurationDetails||'',
       terreVegetaleM3:d.terreVegetaleM3?String(d.terreVegetaleM3):'',prixTerreVegetaleM3:d.prixTerreVegetaleM3?String(d.prixTerreVegetaleM3):'25',
       notesInstallateur:d.notesInstallateur||'',accessTransport:d.accessTransport||'semi',poseSamedi:d.poseSamedi||false,
@@ -209,6 +212,13 @@ export default function NewDevis() {
   const coutElec = form.posteRelevage ? ((parseFloat(form.longueurCableElec)||0) * prixCableMl + (tarifsMateriaux?.fourreauElec||25)) : 0
   const coutTerreVegetale = restauration ? restauration.coutTotal : 0
   const coutEpandage = epandageData ? (epandageData.volumeGravier * 45 + epandageData.longueurDrainTotal * 3) : 0
+  // Blocs à bancher
+  const nbBlocsDroits = parseInt(form.blocsNbDroits)||0
+  const nbBlocsAngles = parseInt(form.blocsNbAngles)||0
+  const nbBlocsTotal = nbBlocsDroits + nbBlocsAngles
+  const pxBlocDroit = parseFloat(form.blocsPrixDroit)||0
+  const pxBlocAngle = parseFloat(form.blocsPrixAngle)||0
+  const coutBlocs = (nbBlocsDroits * pxBlocDroit) + (nbBlocsAngles * pxBlocAngle)
   const COUT_DOSSIER_PHOTO = 100
 
   const moOpts = useMemo(()=>({
@@ -236,7 +246,7 @@ export default function NewDevis() {
         const kit=kitAssocies.find(k=>k.nom===nom)
         return s + (kit?.prix || 150)
       },0)
-      const extras = coutCoudes + coutRehausses + coutElec + coutTerreVegetale + coutEpandage + COUT_DOSSIER_PHOTO
+      const extras = coutCoudes + coutRehausses + coutElec + coutTerreVegetale + coutEpandage + coutBlocs + COUT_DOSSIER_PHOTO
       // Total = tous les coûts CLIENT (opérateurs déjà inclus dans les postes)
       const sousTotal = calc.coutTerrassementClient + calc.coutTransportClient + calc.coutMortierTranspClient + calc.coutMortierMatiere + calc.coutLivraisonClient + calc.coutPoseur + coutMateriel + coutProduitsSup + coutAssocies + extras
       // Remise
@@ -296,6 +306,8 @@ export default function NewDevis() {
     typeRejet:form.typeRejet,
     posteRelevage:form.posteRelevage,longueurCableElec:parseFloat(form.longueurCableElec)||0,sectionCable:form.sectionCable,prixCableMl,prixFourreau:tarifsMateriaux?.fourreauElec||25,coutLigneElec:coutElec,
     nbRehausses:parseInt(form.nbRehausses)||0,prixRehausse:parseFloat(form.prixRehausse)||0,
+    // Blocs à bancher
+    blocsABancher: nbBlocsTotal>0 ? { nbDroits:nbBlocsDroits, nbAngles:nbBlocsAngles, nbTotal:nbBlocsTotal, dimDroits:form.blocsDimDroits, dimAngles:form.blocsDimAngles, prixDroit:pxBlocDroit, prixAngle:pxBlocAngle, coutTotal:coutBlocs, notes:form.blocsNotes } : null,
     restaurationSurface:form.restaurationSurface,restaurationDetails:form.restaurationDetails,
     restauration,
     terreVegetaleM3:restauration?.volumeTerre||0,prixTerreVegetaleM3:tarifsMateriaux?.terreVegetaleM3||25,coutTerreVegetale,
@@ -340,6 +352,7 @@ export default function NewDevis() {
             epandageData&&`Drains : ${epandageData.longueurDrainTotal} ml → ${Math.ceil(epandageData.longueurDrainTotal / 4)} barres de 4m`,
             form.posteRelevage&&`Câble élec : ${form.longueurCableElec||'?'} ml (${form.sectionCable}mm²)`,
             form.posteRelevage&&'Fourreau électrique',
+            nbBlocsTotal>0&&`Blocs bancher : ${nbBlocsDroits} droits + ${nbBlocsAngles} angles = ${nbBlocsTotal}`,
             'Dossier photo : 100€',
             ...form.produitsAssocies.map(p=>{const k=kitAssocies.find(x=>x.nom===p);return`✓ ${p} — ${fmtC(k?.prix||150)}`}),
             ...form.produitsSup.map(p=>`➕ ${p.nom} — ${p.prixHT}€`),
@@ -526,6 +539,27 @@ export default function NewDevis() {
               {form.posteRelevage&&<div className="ml-6 space-y-2"><Info>Le client devra faire installer un fusible dédié + fourreau au tableau électrique.</Info>
                 {!form.longueurCableElec&&<div className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] text-red-400 font-bold">⚠️ Longueur de câble électrique obligatoire !</div>}
                 <div className="grid grid-cols-3 gap-2"><div><label className="text-[9px] text-gray-600">Câble élec (ml) *</label><input type="number" value={form.longueurCableElec} onChange={e=>set('longueurCableElec',e.target.value)} min="0" className={`${inp} ${!form.longueurCableElec?'border-red-500/40 ring-1 ring-red-500/20':''}`} placeholder="obligatoire"/></div><div><label className="text-[9px] text-gray-600">Section câble</label><select value={form.sectionCable} onChange={e=>set('sectionCable',e.target.value)} className={inp}><option value="2.5">2,5 mm² ({tarifsMateriaux?.cableElec25Ml||6}€/ml)</option><option value="4">4 mm² ({tarifsMateriaux?.cableElec4Ml||8}€/ml)</option><option value="6">6 mm² ({tarifsMateriaux?.cableElec6Ml||12}€/ml)</option></select></div><div><label className="text-[9px] text-gray-600">Fourreau</label><p className="h-9 flex items-center text-sm text-gray-400">{fmtC(tarifsMateriaux?.fourreauElec||25)}</p></div></div>{coutElec>0&&<p className="text-[9px] text-gray-500">Total élec : {fmtC(coutElec)} <span className="text-gray-600">(câble {prixCableMl}€/ml × {form.longueurCableElec}ml + fourreau {fmtC(tarifsMateriaux?.fourreauElec||25)})</span></p>}</div>}
+            </div>
+
+            {/* BLOCS À BANCHER */}
+            <div className="border-t border-white/5 pt-3"><label className={lbl}>🧱 Blocs à bancher</label>
+              <div className="grid grid-cols-3 gap-2">
+                <div><label className="text-[9px] text-gray-600">Droits (qté)</label><input type="number" value={form.blocsNbDroits} onChange={e=>set('blocsNbDroits',e.target.value)} min="0" className={inp} placeholder="0"/></div>
+                <div><label className="text-[9px] text-gray-600">Angles (qté)</label><input type="number" value={form.blocsNbAngles} onChange={e=>set('blocsNbAngles',e.target.value)} min="0" className={inp} placeholder="0"/></div>
+                <div><label className="text-[9px] text-gray-600">Total</label><p className="h-9 flex items-center text-sm text-white font-bold">{nbBlocsTotal>0?nbBlocsTotal:'—'}</p></div>
+              </div>
+              {nbBlocsTotal>0&&<div className="mt-2 space-y-2">
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[9px] text-gray-600">Dim. droits</label><select value={form.blocsDimDroits} onChange={e=>set('blocsDimDroits',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
+                  <div><label className="text-[9px] text-gray-600">Dim. angles</label><select value={form.blocsDimAngles} onChange={e=>set('blocsDimAngles',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
+                </div>
+                <div className="grid grid-cols-2 gap-2">
+                  <div><label className="text-[9px] text-gray-600">Prix u. droit (€ HT)</label><input type="number" value={form.blocsPrixDroit} onChange={e=>set('blocsPrixDroit',e.target.value)} min="0" step="0.1" className={inp} placeholder="ex: 2.50"/></div>
+                  <div><label className="text-[9px] text-gray-600">Prix u. angle (€ HT)</label><input type="number" value={form.blocsPrixAngle} onChange={e=>set('blocsPrixAngle',e.target.value)} min="0" step="0.1" className={inp} placeholder="ex: 3.50"/></div>
+                </div>
+                {coutBlocs>0&&<p className="text-[9px] text-gray-500">Total blocs : {nbBlocsDroits>0?`${nbBlocsDroits}×${fmtC(pxBlocDroit)}`:''}{nbBlocsDroits>0&&nbBlocsAngles>0?' + ':''}{nbBlocsAngles>0?`${nbBlocsAngles}×${fmtC(pxBlocAngle)}`:''} = <strong className="text-white">{fmtC(coutBlocs)}</strong></p>}
+                <input value={form.blocsNotes} onChange={e=>set('blocsNotes',e.target.value)} className={inp} placeholder="Notes (optionnel)"/>
+              </div>}
             </div>
 
             {/* ÉPANDAGE */}

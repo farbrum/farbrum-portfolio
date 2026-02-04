@@ -15,7 +15,7 @@ export default function Layout() {
     ...(isAdmin ? [
       { to: '/devis/nouveau', icon: FileText, label: 'Nouveau devis' },
       { to: '/produits', icon: Database, label: 'Base de données' },
-      { to: '/ressources', icon: Users, label: 'Ressources humaines' },
+      { to: '/ressources', icon: Users, label: 'Ressources' },
       { to: '/admin', icon: Settings, label: 'Paramètres' },
     ] : []),
   ]

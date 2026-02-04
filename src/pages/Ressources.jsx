@@ -2,7 +2,7 @@ import { useState, useMemo } from 'react'
 import { useProductStore, ENGINS } from '../store/productStore'
 import { useAuthStore } from '../store/authStore'
 import Window from '../components/Window'
-import { Users, Plus, Trash2, Edit3, Calendar, Save, X, AlertTriangle, ChevronLeft, ChevronRight, Truck, HardHat, Settings } from 'lucide-react'
+import { Users, Plus, Trash2, Edit3, Calendar, Save, X, AlertTriangle, ChevronLeft, ChevronRight, Truck, HardHat, Settings, Phone } from 'lucide-react'
 
 const inp = "w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm text-white placeholder:text-gray-600 focus:outline-none focus:ring-2 focus:ring-rose/30 focus:border-rose transition-all"
 const lbl = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1"
@@ -502,6 +502,71 @@ function TarifsSection() {
   )
 }
 
+// ===== SECTION INSPECTEURS SPANC =====
+function SPANCSection() {
+  const { inspecteursSPANC, addInspecteurSPANC, updateInspecteurSPANC, deleteInspecteurSPANC } = useProductStore()
+  const [mode, setMode] = useState('list')
+  const [editId, setEditId] = useState(null)
+  const [f, setF] = useState({ nom:'', telephone:'', email:'', secteur:'', communes:'', notes:'' })
+  const set = (k,v) => setF(p=>({...p,[k]:v}))
+  const reset = () => { setF({ nom:'', telephone:'', email:'', secteur:'', communes:'', notes:'' }); setMode('list'); setEditId(null) }
+  const startEdit = (i) => { setF({ nom:i.nom||'', telephone:i.telephone||'', email:i.email||'', secteur:i.secteur||'', communes:(i.communes||[]).join(', '), notes:i.notes||'' }); setEditId(i.id); setMode('edit') }
+  const handleSave = () => {
+    const data = { ...f, communes: f.communes.split(',').map(c=>c.trim()).filter(Boolean) }
+    if(editId){ updateInspecteurSPANC(editId, data) } else { addInspecteurSPANC(data) }
+    reset()
+  }
+  const list = inspecteursSPANC || []
+  return (
+    <div className="space-y-3">
+      <div className="grid grid-cols-2 gap-3">
+        <div className="bg-bg-card border border-white/5 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-blue-400">{list.length}</p><p className="text-[9px] text-gray-500 uppercase">Inspecteurs</p></div>
+        <div className="bg-bg-card border border-white/5 rounded-lg p-3 text-center"><p className="text-2xl font-bold text-emerald-400">{new Set(list.flatMap(i=>i.communes||[])).size}</p><p className="text-[9px] text-gray-500 uppercase">Communes couvertes</p></div>
+      </div>
+      {mode==='list'&&<div className="flex justify-end"><button onClick={()=>setMode('add')} className="h-8 px-4 bg-blue-500 text-white text-xs font-semibold rounded flex items-center gap-1.5"><Plus className="w-3.5 h-3.5"/> Ajouter</button></div>}
+      {(mode==='add'||mode==='edit')&&(
+        <Window title={mode==='edit'?`Modifier : ${f.nom}`:'Nouvel inspecteur SPANC'}>
+          <div className="p-5 space-y-3">
+            <div className="grid grid-cols-2 gap-3">
+              <div><label className={lbl}>Nom *</label><input value={f.nom} onChange={e=>set('nom',e.target.value)} className={inp} placeholder="Nom complet"/></div>
+              <div><label className={lbl}>Telephone</label><input value={f.telephone} onChange={e=>set('telephone',e.target.value)} className={inp} placeholder="06 xx xx xx xx"/></div>
+            </div>
+            <div><label className={lbl}>Email</label><input value={f.email} onChange={e=>set('email',e.target.value)} className={inp} placeholder="email@spanc.fr"/></div>
+            <div><label className={lbl}>Secteur geographique</label><input value={f.secteur} onChange={e=>set('secteur',e.target.value)} className={inp} placeholder="ex: Nord Toulouse, Comminges..."/></div>
+            <div><label className={lbl}>Communes (separees par virgule)</label><input value={f.communes} onChange={e=>set('communes',e.target.value)} className={inp} placeholder="Commune1, Commune2, Commune3..."/></div>
+            <div><label className={lbl}>Notes</label><textarea value={f.notes} onChange={e=>set('notes',e.target.value)} rows={2} className={inp+' !h-auto py-2 resize-none'} placeholder="Notes libres..."/></div>
+            <div className="flex gap-2">
+              <button onClick={handleSave} disabled={!f.nom} className="h-8 px-4 bg-blue-500 text-white text-xs font-semibold rounded flex items-center gap-1.5 disabled:opacity-40"><Save className="w-3.5 h-3.5"/>{mode==='edit'?'Modifier':'Ajouter'}</button>
+              <button onClick={reset} className="h-8 px-4 bg-white/5 text-gray-400 text-xs rounded flex items-center gap-1.5"><X className="w-3.5 h-3.5"/>Annuler</button>
+            </div>
+          </div>
+        </Window>
+      )}
+      <div className="space-y-2">
+        {list.map(i=>(
+          <div key={i.id} className="bg-bg-card border border-white/5 rounded-lg p-3">
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <p className="text-sm font-bold text-white">{i.nom}</p>
+                {i.telephone&&<p className="text-xs text-blue-400 flex items-center gap-1 mt-0.5"><Phone className="w-3 h-3"/>{i.telephone}</p>}
+                {i.email&&<p className="text-xs text-gray-400 mt-0.5">{i.email}</p>}
+                {i.secteur&&<p className="text-[10px] text-amber-400 mt-1">Secteur : {i.secteur}</p>}
+                {i.communes?.length>0&&<div className="flex flex-wrap gap-1 mt-1">{i.communes.map(c=>(<span key={c} className="px-1.5 py-0.5 bg-blue-500/10 border border-blue-500/20 rounded text-[9px] text-blue-300">{c}</span>))}</div>}
+                {i.notes&&<p className="text-[9px] text-gray-500 mt-1 italic">{i.notes}</p>}
+              </div>
+              <div className="flex gap-1 ml-2">
+                <button onClick={()=>startEdit(i)} className="w-7 h-7 rounded bg-white/5 hover:bg-white/10 text-gray-400 hover:text-white flex items-center justify-center"><Edit3 className="w-3.5 h-3.5"/></button>
+                <button onClick={()=>{if(confirm('Supprimer cet inspecteur ?'))deleteInspecteurSPANC(i.id)}} className="w-7 h-7 rounded bg-white/5 hover:bg-red-500/20 text-gray-400 hover:text-red-400 flex items-center justify-center"><Trash2 className="w-3.5 h-3.5"/></button>
+              </div>
+            </div>
+          </div>
+        ))}
+        {list.length===0&&<div className="text-center py-8"><Phone className="w-10 h-10 text-gray-700 mx-auto mb-2"/><p className="text-sm text-gray-500">Aucun inspecteur SPANC</p><p className="text-[10px] text-gray-600 mt-1">Ajoutez les inspecteurs de votre secteur pour les retrouver facilement.</p></div>}
+      </div>
+    </div>
+  )
+}
+
 // ===== PAGE PRINCIPALE =====
 export default function Ressources() {
   const { user } = useAuthStore()
@@ -528,6 +593,7 @@ export default function Ressources() {
     {id:'engins',label:'🏗️ Engins'},
     {id:'vehicules',label:'🚛 Véhicules'},
     {id:'tarifs',label:'⚙️ Tarifs'},
+    {id:'spanc',label:'🔵 SPANC'},
   ]
 
   return (
@@ -571,6 +637,7 @@ export default function Ressources() {
       {tab==='engins'&&<EnginsSection/>}
       {tab==='vehicules'&&<VehiculesSection/>}
       {tab==='tarifs'&&<TarifsSection/>}
+      {tab==='spanc'&&<SPANCSection/>}
     </div>
   )
 }

@@ -559,7 +559,7 @@ export const useProductStore = create((set, get) => ({
     if (get().loaded) return
     set({ loading: true })
     try {
-      const [cats, fourns, prods, vehs, engs, ress, tMat, tCh] = await Promise.all([
+      const [cats, fourns, prods, vehs, engs, ress, tMat, tCh, inspSPANC] = await Promise.all([
         db.getAll('categories'),
         db.getAll('fournisseurs'),
         db.getAll('produits'),
@@ -568,6 +568,7 @@ export const useProductStore = create((set, get) => ({
         db.getAll('ressources'),
         settings.get('tarifs_materiaux'),
         settings.get('tarifs_chantier'),
+        db.getAll('inspecteurs_spanc').catch(() => []),
       ])
       set({
         categories: cats?.length > 0 ? cats.map(c => ({ id: c.id, nom: c.nom, typeCategorie: c.data?.typeCategorie || c.type || 'autre', groupeId: c.data?.groupeId || c.groupe || 'divers', ordre: c.data?.ordre || 0, ...(c.data || {}) })) : get().categories,
@@ -586,6 +587,7 @@ export const useProductStore = create((set, get) => ({
         }) : get().vehicules,
         enginsData: engs?.length > 0 ? engs.map(e => ({ id: e.id, nom: e.nom, rendementM3h: e.rendement_m3h, coutHoraire: e.cout_horaire, consommationLH: e.consommation_lh, deplacement: e.deplacement, indisponibilites: e.data?.indisponibilites || [], ...(e.data || {}) })) : get().enginsData,
         ressources: ress?.length > 0 ? ress.map(r => ({ id: r.id, nom: r.nom, pin: r.pin, role: r.role, tarifJournalier: r.tarif_journalier, tarifHoraire: r.tarif_horaire, competences: r.competences || [], joursTravail: r.jours_travail || [1,2,3,4,5], indisponibilites: r.data?.indisponibilites || [], ...(r.data || {}) })) : get().ressources,
+        inspecteursSPANC: inspSPANC?.length > 0 ? inspSPANC.map(i => ({ id: i.id, nom: i.nom, ...(i.data || {}) })) : [],
         tarifsMateriaux: tMat ? { ...TARIFS_MATERIAUX_DEFAULT, ...tMat } : get().tarifsMateriaux,
         tarifsChantier: tCh ? { ...TARIFS_CHANTIER_DEFAULT, ...tCh } : get().tarifsChantier,
         loaded: true, loading: false,
@@ -730,5 +732,29 @@ export const useProductStore = create((set, get) => ({
     set(s => ({ tarifsChantier: { ...s.tarifsChantier, ...d } }))
     const updated = get().tarifsChantier
     settings.set('tarifs_chantier', updated).catch(e => console.error('[DB]', e))
+  },
+
+  // ─── CRUD Inspecteurs SPANC ───
+  inspecteursSPANC: [],
+  addInspecteurSPANC: (d) => {
+    const i = { id: Date.now().toString(), ...d }
+    set(s => ({ inspecteursSPANC: [...s.inspecteursSPANC, i] }))
+    db.upsert('inspecteurs_spanc', { id: i.id, nom: i.nom, data: i }).catch(e => console.error('[DB]', e))
+    return i
+  },
+  updateInspecteurSPANC: (id, d) => {
+    set(s => ({ inspecteursSPANC: s.inspecteursSPANC.map(i => i.id === id ? { ...i, ...d } : i) }))
+    const updated = get().inspecteursSPANC.find(i => i.id === id)
+    if (updated) db.upsert('inspecteurs_spanc', { id, nom: updated.nom, data: updated }).catch(e => console.error('[DB]', e))
+  },
+  deleteInspecteurSPANC: (id) => {
+    set(s => ({ inspecteursSPANC: s.inspecteursSPANC.filter(i => i.id !== id) }))
+    db.delete('inspecteurs_spanc', id).catch(e => console.error('[DB]', e))
+  },
+  getInspecteurByCommune: (commune) => {
+    if (!commune) return null
+    const list = get().inspecteursSPANC
+    const communeLC = commune.toLowerCase()
+    return list.find(i => (i.communes || []).some(c => c.toLowerCase() === communeLC)) || list.find(i => (i.secteur || '').toLowerCase().split(',').some(s => communeLC.includes(s.trim().toLowerCase()))) || null
   },
 }))
