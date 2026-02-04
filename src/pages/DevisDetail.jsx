@@ -1,3 +1,4 @@
+import { ouvrirCompteRendu, telechargerCompteRendu } from '../services/compteRenduPDF'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
@@ -52,6 +53,7 @@ export default function DevisDetail() {
         <button onClick={()=>setShowRedac(!showRedac)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showRedac?'bg-rose/20 text-rose border-rose/40':'bg-white/5 text-gray-400 border-white/10'}`}><FileText className="w-3.5 h-3.5"/><span>Rédac.</span></button>
         <button onClick={()=>setShowFiche(!showFiche)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showFiche?'bg-amber-500/20 text-amber-400 border-amber-500/40':'bg-white/5 text-gray-400 border-white/10'}`}><HardHat className="w-3.5 h-3.5"/><span>Fiche Chantier</span>{devis.ficheChantier?.startedAt&&<span className="ml-1 px-1 py-0.5 bg-rose/20 text-rose text-[8px] rounded">{Object.values(devis.ficheChantier.etapes||{}).filter(e=>e.done).length}✓</span>}</button>
         {isAdmin&&<button onClick={()=>setShowQR(!showQR)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showQR?'bg-blue-500/20 text-blue-400 border-blue-500/40':'bg-white/5 text-gray-400 border-white/10'}`}><span>📱</span><span>QR Poseur</span></button>}
+        {isAdmin&&<button onClick={()=>ouvrirCompteRendu(devis, chantierData, devis.controleurSPANC)} className="h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20 transition-all"><span>📋</span><span>Compte-Rendu</span></button>}
       </div>
     </div>
 

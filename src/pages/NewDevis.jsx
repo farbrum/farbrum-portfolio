@@ -37,7 +37,7 @@ export default function NewDevis() {
   const { id: editId } = useParams()
   const { user } = useAuthStore()
   const { addDevis, updateDevis, getDevisById } = useDevisStore()
-  const { produits, categories, fournisseurs, vehicules, ressources, tarifsMateriaux, tarifsChantier, enginsData } = useProductStore()
+  const { produits, categories, fournisseurs, vehicules, ressources, tarifsMateriaux, tarifsChantier, enginsData, controleursSPANC } = useProductStore()
   const isEdit = !!editId
   const existingDevis = isEdit ? getDevisById(editId) : null
 
@@ -473,6 +473,7 @@ export default function NewDevis() {
               <div><label className={lbl}>Profondeur fil d'eau (m)</label><input type="number" value={form.profondeur} onChange={e=>set('profondeur',e.target.value)} step="0.1" min="0.3" className={inp}/></div>
               <div><label className={lbl}>Accès chantier</label><select value={form.accessTransport} onChange={e=>handleAccessChange(e.target.value)} className={inp}><option value="semi">Semi-remorque OK</option><option value="17t">17 tonnes max</option><option value="10t">10 tonnes max</option><option value="benne">Benne 3.5t seulement</option></select></div>
               <div><label className={lbl}>Nb poseurs sur chantier</label><input type="number" value={form.nbPoseurs} onChange={e=>set('nbPoseurs',e.target.value)} min="1" max="6" className={inp}/></div>
+              <div><label className={lbl}>Contrôleur SPANC</label><select value={form.spancId||''} onChange={e=>set('spancId',e.target.value)} className={inp}><option value="">— Aucun —</option>{(controleursSPANC||[]).map(c=><option key={c.id} value={c.id}>{c.nom}{c.organisme?' — '+c.organisme:''}</option>)}</select></div>
             </div>
             {/* ENGIN + TYPE DE SOL */}
             <div className="grid grid-cols-2 gap-2">

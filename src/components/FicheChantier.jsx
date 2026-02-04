@@ -375,7 +375,7 @@ export default function FicheChantier({ devis }) {
                       <p className="text-amber-400 font-bold">📊 Détail terrassement :</p>
                       <p className="text-gray-300">• Volume fouille : <strong>{devis.volumeFouille?.toFixed(1) || '?'} m³</strong></p>
                       <p className="text-gray-300">• Volume foisonné : <strong>{((devis.volumeFouille||0)*1.3).toFixed(1)} m³</strong></p>
-                      <p className="text-gray-300">• Temps estimé : <strong>{scenario.tempsTerrassement || 0}h</strong></p>
+                      <p className="text-gray-300">• Temps estimé : <strong>{scenario.hExcav || 0}h</strong></p>
                       <p className="text-gray-300">• Profondeur : <strong>{devis.profondeur || 0.5} m</strong></p>
                     </div>
                   )}
