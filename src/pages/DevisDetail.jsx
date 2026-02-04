@@ -1,4 +1,3 @@
-import { ouvrirCompteRendu, telechargerCompteRendu } from '../services/compteRenduPDF'
 import { useState } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
@@ -53,7 +52,6 @@ export default function DevisDetail() {
         <button onClick={()=>setShowRedac(!showRedac)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showRedac?'bg-rose/20 text-rose border-rose/40':'bg-white/5 text-gray-400 border-white/10'}`}><FileText className="w-3.5 h-3.5"/><span>Rédac.</span></button>
         <button onClick={()=>setShowFiche(!showFiche)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showFiche?'bg-amber-500/20 text-amber-400 border-amber-500/40':'bg-white/5 text-gray-400 border-white/10'}`}><HardHat className="w-3.5 h-3.5"/><span>Fiche Chantier</span>{devis.ficheChantier?.startedAt&&<span className="ml-1 px-1 py-0.5 bg-rose/20 text-rose text-[8px] rounded">{Object.values(devis.ficheChantier.etapes||{}).filter(e=>e.done).length}✓</span>}</button>
         {isAdmin&&<button onClick={()=>setShowQR(!showQR)} className={`h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 transition-all ${showQR?'bg-blue-500/20 text-blue-400 border-blue-500/40':'bg-white/5 text-gray-400 border-white/10'}`}><span>📱</span><span>QR Poseur</span></button>}
-        {isAdmin&&<button onClick={()=>ouvrirCompteRendu(devis, chantierData, devis.controleurSPANC)} className="h-7 px-2.5 text-[10px] font-semibold rounded border flex items-center space-x-1 bg-green-500/10 text-green-400 border-green-500/30 hover:bg-green-500/20 transition-all"><span>📋</span><span>Compte-Rendu</span></button>}
       </div>
     </div>
 
@@ -161,6 +159,12 @@ export default function DevisDetail() {
           {pdfMsg&&<p className="text-[10px] text-amber-400 mb-1">{pdfMsg}</p>}
           {hasMulti?(<>{scenarios.map((sc,idx)=>(<div key={idx} className="flex space-x-1"><button type="button" onClick={()=>handlePdfOpen(idx)} className={`flex-1 h-8 text-[10px] font-medium rounded border flex items-center justify-center space-x-1 ${scColors[sc.scenarioId]} ${scText[sc.scenarioId]} hover:opacity-80`}><Eye className="w-3 h-3"/><span>Aperçu {idx+1}</span></button><button type="button" onClick={()=>handlePdfDL(idx)} className={`flex-1 h-8 text-[10px] font-medium rounded border flex items-center justify-center space-x-1 ${scColors[sc.scenarioId]} ${scText[sc.scenarioId]} hover:opacity-80`}><Download className="w-3 h-3"/><span>DL {idx+1}</span></button></div>))}<button type="button" onClick={()=>pdfService.combinerPDF(devis)} className="w-full h-8 mt-1 bg-rose/10 hover:bg-rose/20 text-rose text-[10px] font-bold rounded border border-rose/30 flex items-center justify-center space-x-1"><Layers className="w-3 h-3"/><span>📄 Combiner tous les scénarios (1 PDF)</span></button><button type="button" onClick={()=>pdfService.telechargerTousScenarios(devis)} className="w-full h-8 mt-1 bg-white/5 hover:bg-white/10 text-gray-300 text-[10px] font-medium rounded border border-white/10 flex items-center justify-center space-x-1"><Layers className="w-3 h-3"/><span>Télécharger séparément (3 PDF)</span></button></>):(<><button type="button" onClick={()=>handlePdfOpen(0)} className="w-full h-9 bg-rose/10 hover:bg-rose/20 text-rose text-xs font-medium rounded border border-rose/30 flex items-center justify-center space-x-1.5"><Eye className="w-3.5 h-3.5"/><span>Aperçu PDF</span></button><button type="button" onClick={()=>handlePdfDL(0)} className="w-full h-9 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded border border-white/10 flex items-center justify-center space-x-1.5"><Download className="w-3.5 h-3.5"/><span>Télécharger PDF</span></button></>)}
         </div></Window>
+
+        {isAdmin&&<Window title="📋 PDF Poseur"><div className="p-4 space-y-2">
+          <p className="text-[9px] text-gray-500 mb-2">Dossier installateur avec procédure de connexion, QR code et fiche technique complète.</p>
+          <button type="button" onClick={async()=>{setPdfMsg('Génération fiche poseur...');try{await pdfService.ouvrirFichePoseur(devis);setPdfMsg('')}catch(e){setPdfMsg('Erreur: '+e.message)}}} className="w-full h-9 bg-amber-500/10 hover:bg-amber-500/20 text-amber-400 text-xs font-medium rounded border border-amber-500/30 flex items-center justify-center space-x-1.5"><Eye className="w-3.5 h-3.5"/><span>Aperçu PDF Poseur</span></button>
+          <button type="button" onClick={async()=>{setPdfMsg('Téléchargement...');try{await pdfService.telechargerFichePoseur(devis);setPdfMsg('')}catch(e){setPdfMsg('Erreur: '+e.message)}}} className="w-full h-9 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded border border-white/10 flex items-center justify-center space-x-1.5"><Download className="w-3.5 h-3.5"/><span>Télécharger PDF Poseur</span></button>
+        </div></Window>}
 
         {/* SUIVI CHANTIER */}
         {isAdmin&&(() => {

@@ -220,15 +220,22 @@ function genScenario(doc, devis, scenarioIdx, isFirst) {
   fr2.push({_footer:true,_bold:true,_cells:['TOTAL TTC',fmt(sc.totalTTC)]})
   y=drawTable(doc,14,y,[110,70],fr2); y+=8
 
-  // CONDITIONS
-  y=ck(doc,y,35)
-  doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,32,2,2,'F')
-  doc.setDrawColor(...ROSE);doc.setLineWidth(0.5);doc.roundedRect(12,y,186,32,2,2)
-  y+=5; doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE);doc.text('CONDITIONS',16,y);y+=4
-  doc.setFontSize(7);doc.setFont(undefined,'normal');doc.setTextColor(60,60,60)
-  const co=["Ce devis est valable 3 mois à compter de sa date d'émission.",'Travaux réalisés conformément aux normes SPANC en vigueur.','Acompte de 30% à la signature du devis.','Prix final selon nature du sol constatée lors des travaux.','Dossier photographique obligatoire : 100 EUR HT.']
-  if(devis.posteRelevage)co.push("Le client s'engage à faire installer à son tableau électrique un fusible dédié avec un fourreau pour le passage du câble électrique du poste de relevage.")
-  co.forEach(c=>{const ls=doc.splitTextToSize(c,175);ls.forEach(l=>{doc.text('• '+l,16,y);y+=3})})
+  // CONDITIONS PARTICULIÈRES
+  y=ck(doc,y,15); y=secH(doc,y,'CONDITIONS PARTICULIÈRES')
+  const condPart = [
+    { num:'1', titre:'Validité du devis', txt:"Le présent devis est valable un (1) mois à compter de sa date d'émission." },
+    { num:'2', titre:'Contact obligatoire avec l\'inspecteur SPANC', txt:"Le client s'engage à prendre contact impérativement avec son inspecteur SPANC avant tout démarrage. Lors de cet échange, il devra communiquer les éléments techniques que nous avons renseignés dans le devis (filière retenue, implantation, prescriptions, etc.)." },
+    { num:'3', titre:'Absence d\'étude de sol (si non prévue au devis)', txt:"Lorsque le devis a été établi sans étude de sol, le client reconnaît que les conditions réelles du terrain peuvent différer des hypothèses retenues. En conséquence, en fonction de la nature des remblais et des contraintes découvertes lors de l'excavation, le client s'engage à supporter le coût des adaptations et/ou travaux complémentaires nécessaires, au moyen d'un devis ajusté correspondant aux contraintes constatées." },
+    { num:'4', titre:'Dossier photo obligatoire', txt:"Un dossier photo (avant / pendant / après travaux) est obligatoire et fait partie intégrante de notre procédure de suivi et de conformité." },
+    { num:'5', titre:'Raccordement électrique pour pompe(s) (si applicable)', txt:"Dans l'hypothèse où un raccordement électrique doit être réalisé pour une ou plusieurs pompes, le client s'engage à faire installer, en amont des travaux : une gaine conforme pour l'alimentation, ainsi qu'un coupe-circuit / dispositif de protection adapté, le tout dimensionné selon la puissance indiquée au devis." },
+  ]
+  for(const cp of condPart){
+    y=ck(doc,y,14)
+    doc.setFontSize(7.5);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE);doc.text(`${cp.num}. ${cp.titre}`,14,y);y+=3.5
+    doc.setFontSize(7);doc.setFont(undefined,'normal');doc.setTextColor(60,60,60)
+    const ls=doc.splitTextToSize(cp.txt,178); for(const l of ls){y=ck(doc,y,4);doc.text(l,14,y);y+=3.2}
+    y+=1.5
+  }
 }
 
 // ===== FICHE TECHNIQUE ANNEXE =====
@@ -390,20 +397,180 @@ function genFicheTechnique(doc, devis) {
   }
 }
 
+// ===== FICHE TECHNIQUE PRODUIT (annexe obligatoire devis client) =====
+function genFicheTechniqueProduit(doc, devis) {
+  doc.addPage(); drawBorder(doc)
+  let y = 12
+
+  try{doc.addImage(LOGO_B64,'PNG',14,y,25,19)}catch(e){}
+  doc.setFontSize(14);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+  doc.text('FICHE TECHNIQUE PRODUIT',45,y+8)
+  doc.setFontSize(9);doc.setTextColor(100,100,100);doc.setFont(undefined,'normal')
+  doc.text(`Annexe au devis N° ${devis.numeroDevis||''}`,45,y+14)
+  y+=25; doc.setDrawColor(...ROSE);doc.setLineWidth(0.5);doc.line(12,y,198,y); y+=6
+
+  y=secH(doc,y,'PRODUIT INSTALLÉ')
+  y=tl(doc,y,'Modèle :',devis.produitNom||'—')
+  y=tl(doc,y,'Type :',TYPES[devis.typeInstallation]||'—')
+  y=tl(doc,y,'Mode :',MODES[devis.modeInstallation]||'—')
+  if(devis.produitDescription){
+    y=tl(doc,y,'Description :','')
+    y=para(doc,y-3,devis.produitDescription)
+    y+=2
+  }
+
+  // Dimensions cuves
+  if(devis.volumeCuves>0 || devis.volumeFouille>0){
+    y=secH(doc,y,'CARACTÉRISTIQUES TECHNIQUES')
+    const rows = [{_header:true,_cells:['Paramètre','Valeur']}]
+    if(devis.volumeCuves>0) rows.push({_cells:['Volume cuves',`${devis.volumeCuves.toFixed(2)} m³`]})
+    if(devis.volumeFouille>0) rows.push({_cells:['Volume fouille requis',`${devis.volumeFouille.toFixed(2)} m³`]})
+    if(devis.surfaceFouille>0) rows.push({_cells:['Surface emprise',`${devis.surfaceFouille.toFixed(2)} m²`]})
+    if(devis.profondeur>0) rows.push({_cells:['Profondeur',`${devis.profondeur} m`]})
+    rows.push({_cells:['Rejet',REJETS[devis.typeRejet]||devis.typeRejet||'—']})
+    if(devis.posteRelevage) rows.push({_cells:['Poste de relevage','OUI']})
+    if(devis.nbRehausses>0) rows.push({_cells:['Rehausses',`${devis.nbRehausses} unité(s)`]})
+    y=drawTable(doc,14,y,[120,60],rows); y+=6
+  }
+
+  // Tuyauterie
+  const hasPipes = devis.tuyauxAvantFiliere>0 || devis.tuyauxApresFiliere>0
+  if(hasPipes){
+    y=secH(doc,y,'TUYAUTERIE ASSOCIÉE')
+    const pRows = [{_header:true,_cells:['Élément','Métrage']}]
+    if(devis.tuyauxAvantFiliere>0) pRows.push({_cells:['PVC avant filière',`${devis.tuyauxAvantFiliere} ml`]})
+    if(devis.tuyauxApresFiliere>0) pRows.push({_cells:['PVC après filière',`${devis.tuyauxApresFiliere} ml`]})
+    if(devis.nbCoudesPVC>0) pRows.push({_cells:['Coudes PVC',`${devis.nbCoudesPVC}`]})
+    y=drawTable(doc,14,y,[120,60],pRows); y+=6
+  }
+
+  // Épandage
+  if(devis.epandage){
+    y=secH(doc,y,'ÉPANDAGE')
+    y=tl(doc,y,'Surface :',`${devis.epandage.surfaceM2} m²`)
+    y=tl(doc,y,'Drains :',`${devis.epandage.nbDrains} × ${devis.epandage.longueurParDrain} ml`)
+    y=tl(doc,y,'Gravier 20/40 :',`${devis.epandage.volumeGravier} m³`)
+  }
+
+  // Note conformité
+  y+=4;y=ck(doc,y,15)
+  doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,12,2,2,'F')
+  doc.setDrawColor(...ROSE);doc.setLineWidth(0.3);doc.roundedRect(12,y,186,12,2,2)
+  doc.setFontSize(7);doc.setFont(undefined,'italic');doc.setTextColor(100,70,85)
+  doc.text("Ce matériel est conforme aux normes en vigueur et dispose d'un agrément ministériel. Consulter la fiche fabricant pour les détails complets.",16,y+5)
+  doc.text("L'installation sera réalisée conformément aux préconisations du fabricant, du SPANC et de l'étude de sol.",16,y+9)
+}
+
+// ===== CONDITIONS GÉNÉRALES DE VENTE =====
+function genCGV(doc) {
+  doc.addPage(); drawBorder(doc)
+  let y = 12
+
+  try{doc.addImage(LOGO_B64,'PNG',14,y,25,19)}catch(e){}
+  doc.setFontSize(14);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+  doc.text('CONDITIONS GÉNÉRALES DE VENTE',45,y+8)
+  doc.setFontSize(7);doc.setTextColor(100,100,100);doc.setFont(undefined,'normal')
+  doc.text(`${ENT.nom} — ${ENT.adresse}, ${ENT.cp} ${ENT.ville} — SIRET: ${ENT.siret}`,45,y+13)
+  y+=22; doc.setDrawColor(...ROSE);doc.setLineWidth(0.5);doc.line(12,y,198,y); y+=5
+
+  doc.setFontSize(6.5);doc.setFont(undefined,'normal');doc.setTextColor(50,50,50)
+  const intro = `Les présentes Conditions Générales de Vente (CGV) régissent l'ensemble des relations contractuelles entre ${ENT.nom} (ci-après « la Société ») et ses clients (ci-après « le Client »). Toute commande implique l'acceptation sans réserve des présentes CGV.`
+  const introL=doc.splitTextToSize(intro,180); for(const l of introL){y=ck(doc,y,3.5);doc.text(l,14,y);y+=3}; y+=2
+
+  const articles = [
+    { titre:'Article 1 : Objet', txt:"Les présentes CGV s'appliquent à toutes les ventes de matériels (micro-stations, fosses septiques, filtres compacts) et prestations de services liées à l'installation, la pose, l'entretien, la réparation ou le diagnostic de systèmes d'Assainissement Non Collectif (ANC), conformément à la réglementation française (arrêté du 7 septembre 2009 modifié). Les prestations incluent : étude de sol, conception, pose, mise en service, vidange, curage, inspection, dépannage." },
+    { titre:'Article 2 : Devis et Commande', txt:"Toute prestation fait l'objet d'un devis gratuit, valable 1 mois. Le devis est établi sous réserve de difficultés imprévues (amiante, calcaire, racines, anomalies de sol) qui seront facturées en sus après accord du Client. La commande est ferme à la signature du devis avec mention « Bon pour accord ». La Société peut refuser une commande pour tout motif légitime." },
+    { titre:'Article 3 : Prix et Paiement', txt:"Les prix sont indiqués en euros HT, majorés de la TVA en vigueur. Acompte de 30% à 50% à la commande (selon devis > 500€ HT). Solde à la réception des travaux par chèque, virement ou carte bancaire. Toute heure commencée (>10 min) est due intégralement. Retard de paiement : pénalités de 3 fois le taux d'intérêt légal + indemnité forfaitaire de 40€ (art. L.441-10 C. com.). Suspension des prestations et exigibilité immédiate de toutes sommes dues." },
+    { titre:'Article 4 : Exécution et Livraison', txt:"Délais indicatifs et non garantis. Obligation de moyens dans les règles de l'art (NF DTU 64.1). Le Client doit coopérer pleinement (accès libre, informations précises, fourniture eau/électricité). La pose respecte les normes (étude de sol, agrément SPANC). La Société n'est pas responsable des non-conformités préexistantes. Réception par PV contradictoire signé ; sans réserves écrites, travaux réputés conformes." },
+    { titre:'Article 5 : Garanties et Responsabilités', txt:"Garanties légales : conformité 2 ans (neuf), 1 an (occasion), vices cachés (art. 1641 C. civil). Exclues : usure normale, mauvaise utilisation, manque d'entretien. Responsabilité limitée aux dommages directs causés par faute prouvée, plafonnée au montant HT de la commande. Exclus : dommages indirects, vices cachés des installations existantes, anomalies de sol. La Société est assurée en RC professionnelle." },
+    { titre:'Article 6 : Réserve de Propriété', txt:"Les matériels restent propriété de la Société jusqu'au paiement intégral (art. 2367 C. civil). Risques transférés au Client dès la livraison/pose." },
+    { titre:'Article 7 : Droit de Rétractation', txt:"Délai de 14 jours (consommateurs uniquement). Exclu pour : urgences, prestations exécutées avec renoncement exprès, produits personnalisés (ANC sur mesure). Remboursement intégral hors frais de retour si produit intact." },
+    { titre:'Article 8 : Force Majeure', txt:"Exonération en cas d'événement imprévisible et insurmontable (grève, intempéries, pandémie, pénurie). Suspension ou annulation sans indemnité si > 15 jours." },
+    { titre:'Article 9 : Propriété Intellectuelle et Données', txt:"Plans, études et devis restent propriété de la Société. Données personnelles traitées conformément au RGPD." },
+    { titre:'Article 10 : Litiges', txt:"Tout litige relève du tribunal de commerce de Toulouse. Loi française applicable. Clause pénale : 10% du montant HT en cas de non-respect par le Client." },
+  ]
+
+  for(const art of articles){
+    y=ck(doc,y,12)
+    doc.setFontSize(7);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE);doc.text(art.titre,14,y);y+=3
+    doc.setFontSize(6.3);doc.setFont(undefined,'normal');doc.setTextColor(50,50,50)
+    const ls=doc.splitTextToSize(art.txt,180); for(const l of ls){y=ck(doc,y,3);doc.text(l,14,y);y+=2.8}
+    y+=1.5
+  }
+
+  // Signature
+  y=ck(doc,y,20); y+=3
+  doc.setDrawColor(...ROSE);doc.setLineWidth(0.3);doc.line(12,y,198,y); y+=4
+  doc.setFontSize(7);doc.setFont(undefined,'italic');doc.setTextColor(80,80,80)
+  doc.text("Le Client reconnaît avoir reçu et accepté les présentes CGV.",14,y); y+=5
+  doc.setFontSize(7);doc.setFont(undefined,'normal');doc.setTextColor(60,60,60)
+  doc.text('Date :  ___/___/______',14,y)
+  doc.text('Signature du Client (précédée de la mention « Bon pour accord ») :',90,y); y+=15
+  doc.setDrawColor(180,180,180);doc.setLineWidth(0.2);doc.rect(90,y-10,100,12)
+}
+
+// ===== FICHE POSEUR (PDF séparé avec QR + procédure) =====
+function genFichePoseur(doc, devis, qrDataUrl) {
+  doc.addPage(); drawBorder(doc)
+  let y = 12
+
+  try{doc.addImage(LOGO_B64,'PNG',14,y,25,19)}catch(e){}
+  doc.setFontSize(14);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+  doc.text('DOSSIER INSTALLATEUR',45,y+8)
+  doc.setFontSize(9);doc.setTextColor(100,100,100);doc.setFont(undefined,'normal')
+  doc.text(`Devis N° ${devis.numeroDevis||''} — ${devis.client?.nomComplet||''}`,45,y+14)
+  y+=25; doc.setDrawColor(...ROSE);doc.setLineWidth(0.5);doc.line(12,y,198,y); y+=6
+
+  // Procédure de connexion
+  y=secH(doc,y,'PROCÉDURE D\'ACCÈS AU DOSSIER TECHNIQUE')
+  doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,38,2,2,'F')
+  doc.setDrawColor(...ROSE);doc.setLineWidth(0.3);doc.roundedRect(12,y,186,38,2,2)
+  y+=4
+  doc.setFontSize(8.5);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+  doc.text('📱 Pour accéder à votre dossier technique en ligne :',16,y);y+=5
+  doc.setFontSize(8);doc.setFont(undefined,'normal');doc.setTextColor(50,50,50)
+  const steps = [
+    '1. Scannez le QR code ci-dessous avec votre téléphone',
+    '   OU rendez-vous sur : ' + (typeof window !== 'undefined' ? window.location.origin : 'https://app.farbrum.fr') + '/chantier/' + devis.id,
+    '2. Entrez votre code PIN personnel (fourni par l\'administrateur)',
+    '3. Vous accédez à la fiche de suivi du chantier avec :',
+    '   — Les étapes de pose à suivre dans l\'ordre',
+    '   — La prise de photos obligatoire à chaque étape',
+    '   — Les détails techniques (volumes, distances, matériaux)',
+  ]
+  steps.forEach(s=>{doc.text(s,16,y);y+=3.5})
+  y+=4
+
+  // QR Code
+  if(qrDataUrl){
+    y=ck(doc,y,55)
+    doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+    doc.text('QR CODE — ACCÈS CHANTIER',105,y,{align:'center'});y+=4
+    try{doc.addImage(qrDataUrl,'PNG',72,y,66,66)}catch(e){}
+    y+=70
+    doc.setFontSize(7);doc.setTextColor(120,120,120);doc.setFont(undefined,'italic')
+    doc.text('Scannez ce QR code pour accéder au dossier technique en ligne.',105,y,{align:'center'});y+=5
+  }
+
+  // Puis on insère la fiche technique chantier complète
+  genFicheTechnique(doc, devis)
+}
+
 export const pdfService = {
-  // Génère un PDF pour un seul scénario + fiche technique
+  // Génère un PDF CLIENT : scénario + fiche technique produit + CGV (SANS fiche technique chantier)
   genererDevisPDF(devis, scenarioIdx=0) {
     try {
       const doc = new jsPDF()
       genScenario(doc, devis, scenarioIdx, true)
-      genFicheTechnique(doc, devis)
+      genFicheTechniqueProduit(doc, devis)
+      genCGV(doc)
       const pages=doc.internal.getNumberOfPages()
       for(let i=1;i<=pages;i++){doc.setPage(i);drawBorder(doc);drawPageNum(doc,i,pages);drawFooter(doc)}
       return doc
     } catch(err){ console.error('Erreur PDF:',err); alert('Erreur PDF : '+err.message); return null }
   },
 
-  // Génère un PDF combiné avec TOUS les scénarios + fiche technique
+  // Génère un PDF CLIENT combiné avec TOUS les scénarios + fiche produit + CGV
   genererCombinePDF(devis) {
     try {
       const doc = new jsPDF()
@@ -411,11 +578,28 @@ export const pdfService = {
       for(let i = 0; i < nbSc; i++){
         genScenario(doc, devis, i, i === 0)
       }
-      genFicheTechnique(doc, devis)
+      genFicheTechniqueProduit(doc, devis)
+      genCGV(doc)
       const pages=doc.internal.getNumberOfPages()
       for(let i=1;i<=pages;i++){doc.setPage(i);drawBorder(doc);drawPageNum(doc,i,pages);drawFooter(doc)}
       return doc
     } catch(err){ console.error('Erreur PDF combiné:',err); alert('Erreur PDF combiné : '+err.message); return null }
+  },
+
+  // Génère un PDF POSEUR : dossier installateur + QR code + procédure + fiche technique chantier
+  async genererFichePoseurPDF(devis) {
+    try {
+      const { generateQRDataUrl, buildChantierUrl } = await import('../components/QRCode')
+      const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.farbrum.fr'
+      const url = buildChantierUrl(baseUrl, devis.id)
+      const qrDataUrl = await generateQRDataUrl(url, 200)
+      const doc = new jsPDF()
+      drawBorder(doc)
+      genFichePoseur(doc, devis, qrDataUrl)
+      const pages=doc.internal.getNumberOfPages()
+      for(let i=1;i<=pages;i++){doc.setPage(i);drawBorder(doc);drawPageNum(doc,i,pages);drawFooter(doc)}
+      return doc
+    } catch(err){ console.error('Erreur PDF poseur:',err); alert('Erreur PDF poseur : '+err.message); return null }
   },
 
   telechargerPDF(d,i=0){const doc=this.genererDevisPDF(d,i);if(!doc)return;const s=d.scenarios?.length>1?'_'+(d.scenarios[i]?.scenarioId||i):'';doc.save(`Devis_${d.numeroDevis||'X'}${s}.pdf`)},
@@ -427,5 +611,19 @@ export const pdfService = {
     const doc=this.genererCombinePDF(d)
     if(!doc)return
     doc.save(`Devis_${d.numeroDevis||'X'}_COMPLET.pdf`)
+  },
+
+  // PDF Poseur : télécharger
+  async telechargerFichePoseur(d){
+    const doc=await this.genererFichePoseurPDF(d)
+    if(!doc)return
+    doc.save(`Fiche_Poseur_${d.numeroDevis||'X'}.pdf`)
+  },
+
+  // PDF Poseur : ouvrir dans un nouvel onglet
+  async ouvrirFichePoseur(d){
+    const doc=await this.genererFichePoseurPDF(d)
+    if(!doc)return
+    try{const b=doc.output('blob'),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u)},1000)}catch(e){await this.telechargerFichePoseur(d)}
   },
 }
