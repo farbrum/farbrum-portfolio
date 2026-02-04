@@ -291,12 +291,12 @@ export default function NewDevis() {
     totalHT:scenarios[0]?.totalHT||0,totalTVA:scenarios[0]?.totalTVA||0,totalTTC:scenarios[0]?.totalTTC||0,
   })
 
-  const submit = (e) => {
+  const submit = async (e) => {
     e.preventDefault()
     if(!form.typeInstallation){alert('Veuillez sélectionner un type ANC');setStep(2);return}
     const data=buildDevisData()
     if(isEdit){updateDevis(editId,data);navigate(`/devis/${editId}`)}
-    else{const saved=addDevis(data);navigate(`/devis/${saved.id}`)}
+    else{const saved=await addDevis(data);navigate(`/devis/${saved?.id||'/'}`)}
   }
 
   const steps=[{n:1,l:'Client'},{n:2,l:'Install.'},{n:3,l:'Produit'},{n:4,l:'GPS'},{n:5,l:'Technique'},{n:6,l:'Rédaction'},{n:7,l:'Devis'}]
