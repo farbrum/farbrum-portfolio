@@ -1,3 +1,4 @@
+import { calcBlocsAerien, calcMurSoutenement } from '../store/calcBlocs'
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
@@ -63,6 +64,10 @@ export default function NewDevis() {
     restaurationSurface:false,restaurationDetails:'',
     terreVegetaleM3:'',prixTerreVegetaleM3:'25',
     notesInstallateur:'',
+    // Blocs à bancher (aérien)
+    prixBlocBancher:'2.50',prixBlocAngle:'3.00',prixBetonBlocM3:'120',prixFerT10Kg:'1.50',
+    // Mur soutènement
+    murSoutenement:false,murLongueur:'',murHauteur:'',murEpaisseur:'0.20',murFondation:false,murFondLargeur:'0.40',murFondHauteur:'0.30',
     accessTransport:'semi',
     poseSamedi:false,
     // Épandage
@@ -94,7 +99,9 @@ export default function NewDevis() {
       nbRehausses:d.nbRehausses?String(d.nbRehausses):'0',prixRehausse:d.prixRehausse?String(d.prixRehausse):'35',
       restaurationSurface:d.restaurationSurface||false,restaurationDetails:d.restaurationDetails||'',
       terreVegetaleM3:d.terreVegetaleM3?String(d.terreVegetaleM3):'',prixTerreVegetaleM3:d.prixTerreVegetaleM3?String(d.prixTerreVegetaleM3):'25',
-      notesInstallateur:d.notesInstallateur||'',accessTransport:d.accessTransport||'semi',poseSamedi:d.poseSamedi||false,
+      notesInstallateur:d.notesInstallateur||'',
+      prixBlocBancher:d.prixBlocBancher?String(d.prixBlocBancher):'2.50',prixBlocAngle:d.prixBlocAngle?String(d.prixBlocAngle):'3.00',prixBetonBlocM3:d.prixBetonBlocM3?String(d.prixBetonBlocM3):'120',prixFerT10Kg:d.prixFerT10Kg?String(d.prixFerT10Kg):'1.50',
+      murSoutenement:d.murSoutenement||false,murLongueur:d.murLongueur?String(d.murLongueur):'',murHauteur:d.murHauteur?String(d.murHauteur):'',murEpaisseur:d.murEpaisseur?String(d.murEpaisseur):'0.20',murFondation:d.murFondation||false,murFondLargeur:d.murFondLargeur?String(d.murFondLargeur):'0.40',murFondHauteur:d.murFondHauteur?String(d.murFondHauteur):'0.30',accessTransport:d.accessTransport||'semi',poseSamedi:d.poseSamedi||false,
       epandageSurface:d.epandage?.surfaceM2?String(d.epandage.surfaceM2):'',epandageNbDrains:d.epandage?.nbDrains?String(d.epandage.nbDrains):'',
       remiseType:d.remisePourcent>0?'pourcent':'montant',remisePourcent:d.remisePourcent?String(d.remisePourcent):'',remiseMontant:d.remiseMontant?String(d.remiseMontant):'',
       sections:d.sectionsRedactionnelles||SECTIONS_REDACTIONNELLES.map(s=>({...s,texte:s.defaut})),
@@ -207,6 +214,16 @@ export default function NewDevis() {
   const coutRehausses = (parseInt(form.nbRehausses)||0) * (parseFloat(form.prixRehausse)||0)
   const prixCableMl = form.sectionCable==='2.5'?(tarifsMateriaux?.cableElec25Ml||6):form.sectionCable==='6'?(tarifsMateriaux?.cableElec6Ml||12):(tarifsMateriaux?.cableElec4Ml||8)
   const coutElec = form.posteRelevage ? ((parseFloat(form.longueurCableElec)||0) * prixCableMl + (tarifsMateriaux?.fourreauElec||25)) : 0
+  // ─── Blocs à bancher (aérien/semi-enterré) ───
+  const tarifsBlocs = {prixBlocBancher:form.prixBlocBancher,prixBlocAngle:form.prixBlocAngle,prixBetonM3:form.prixBetonBlocM3,prixFerT10Kg:form.prixFerT10Kg}
+  const isAerien = form.modeInstallation === 'aerien' || form.modeInstallation === 'semi_enterre'
+  const blocsAerien = (isAerien && sel?.cuves?.length > 0) ? calcBlocsAerien(sel.cuves, tarifsBlocs) : null
+  const coutBlocsAerien = blocsAerien?.couts?.coutTotal || 0
+
+  // ─── Mur de soutènement ───
+  const murData = form.murSoutenement ? calcMurSoutenement({longueur:form.murLongueur,hauteur:form.murHauteur,epaisseur:form.murEpaisseur,fondation:form.murFondation,fondLargeur:form.murFondLargeur,fondHauteur:form.murFondHauteur}, tarifsBlocs) : null
+  const coutMurSoutenement = murData?.couts?.coutTotal || 0
+
   const coutTerreVegetale = restauration ? restauration.coutTotal : 0
   const coutEpandage = epandageData ? (epandageData.volumeGravier * 45 + epandageData.longueurDrainTotal * 3) : 0
   const COUT_DOSSIER_PHOTO = 100
@@ -304,6 +321,13 @@ export default function NewDevis() {
     remisePourcent:form.remiseType==='pourcent'?parseFloat(form.remisePourcent)||0:0,
     remiseMontant:form.remiseType==='montant'?parseFloat(form.remiseMontant)||0:0,
     sectionsRedactionnelles:form.sections,
+    // Blocs à bancher
+    blocsAerien,coutBlocsAerien,
+    prixBlocBancher:parseFloat(form.prixBlocBancher)||2.50,prixBlocAngle:parseFloat(form.prixBlocAngle)||3.00,prixBetonBlocM3:parseFloat(form.prixBetonBlocM3)||120,prixFerT10Kg:parseFloat(form.prixFerT10Kg)||1.50,
+    // Mur soutènement
+    murSoutenement:form.murSoutenement,murLongueur:parseFloat(form.murLongueur)||0,murHauteur:parseFloat(form.murHauteur)||0,murEpaisseur:parseFloat(form.murEpaisseur)||0.20,
+    murFondation:form.murFondation,murFondLargeur:parseFloat(form.murFondLargeur)||0.40,murFondHauteur:parseFloat(form.murFondHauteur)||0.30,
+    murData,coutMurSoutenement,
     scenarios:form.absenceEtudeSol?scenarios:[scenarios[0]],
     totalHT:scenarios[0]?.totalHT||0,totalTVA:scenarios[0]?.totalTVA||0,totalTTC:scenarios[0]?.totalTTC||0,
   })
@@ -336,6 +360,10 @@ export default function NewDevis() {
             (parseInt(form.nbCoudesPVC)||0)>0&&`Coudes : ${form.nbCoudesPVC}`,
             volRemblais>0&&`Remblais 0/20 : ${volRemblais.toFixed(1)} m³`,
             volSablePVC>0&&`Sable PVC : ${volSablePVC.toFixed(2)} m³`,
+            blocsAerien&&`Blocs bancher : ${blocsAerien.blocs.totalBlocsDroits} droits + ${blocsAerien.blocs.totalBlocsAngle} angles`,
+            blocsAerien&&`Béton remplissage : ${blocsAerien.blocs.volBeton} m³`,
+            blocsAerien&&`Fer T10 : ${blocsAerien.blocs.nbBarres6m} barres 6m (${blocsAerien.blocs.poidsFer} kg)`,
+            murData&&`Mur soutènement : ${murData.totalBlocs} blocs, ${murData.volBetonTotal} m³ béton`,
             epandageData&&`Gravier épandage : ${epandageData.volumeGravier} m³`,
             epandageData&&`Drains : ${epandageData.longueurDrainTotal} ml`,
             form.posteRelevage&&`Câble élec : ${form.longueurCableElec||'?'} ml (${form.sectionCable}mm²)`,
@@ -402,7 +430,23 @@ export default function NewDevis() {
 
           {step===3&&<Window title="3 — Produit"><div className="p-5 space-y-4">
             {produitsFiltered.length===0?<div className="py-6 text-center bg-amber-500/5 border border-amber-500/15 rounded space-y-3"><p className="text-xs text-amber-400">Aucun produit.</p><button type="button" onClick={()=>navigate('/produits')} className="h-8 px-4 bg-rose text-white text-xs font-semibold rounded">📦 Base données</button></div>:(<>
-              <div><label className={lbl}>Modèle ANC *</label><select value={form.produitId} onChange={e=>set('produitId',e.target.value)} className={`${inp} ${!form.produitId?'border-red-500/40':''}`} required><option value="">— Sélectionner —</option>{produitsFiltered.sort((a,b)=>(a.prixHT||0)-(b.prixHT||0)).map(p=>{const f=fournisseurs.find(x=>x.id===p.fournisseurId);return<option key={p.id} value={p.id}>{p.nom}{p.materiau?` [${p.materiau.toUpperCase()}]`:''} ({f?.nom||'?'}) — {p.prixHT?`${p.prixHT}€`:'N/D'}</option>})}</select></div>
+              <div><label className={lbl}>Modèle ANC *</label><select value={form.produitId} onChange={e=>set('produitId',e.target.value)} className={`${inp} ${!form.produitId?'border-red-500/40':''}`} required><option value="">— Sélectionner —</option>{(() => {
+                  // Grouper par fournisseur, trier par nom
+                  const grouped = {}
+                  produitsFiltered.forEach(p => {
+                    const f = fournisseurs.find(x => x.id === p.fournisseurId)
+                    const fNom = f?.nom || 'Autre'
+                    if (!grouped[fNom]) grouped[fNom] = []
+                    grouped[fNom].push(p)
+                  })
+                  return Object.keys(grouped).sort().map(fNom => (
+                    <optgroup key={fNom} label={fNom}>
+                      {grouped[fNom].sort((a,b) => (a.nom||'').localeCompare(b.nom||'')).map(p => (
+                        <option key={p.id} value={p.id}>{p.nom}{p.materiau ? ` [${p.materiau.toUpperCase()}]` : ''} — {p.prixHT ? `${p.prixHT}€` : 'N/D'}</option>
+                      ))}
+                    </optgroup>
+                  ))
+                })()}</select></div>
               {!form.produitId&&<div className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] text-red-400">⚠️ Sélectionnez un produit ANC pour continuer</div>}
               {sel&&<div className="bg-rose/10 border border-rose/25 rounded p-3"><p className="text-sm font-medium text-rose">{sel.nom}</p><div className="text-[10px] text-rose/70 space-y-0.5">{sel.cuves?.length>0&&<p>{sel.cuves.length} cuve(s): {sel.cuves.map((c,i)=>`C${i+1}: ${c.longueur||'?'}×${c.largeur||'?'}×${c.hauteur||'?'}m`).join(' + ')}</p>}{volFouille>0&&<p>Fouille: {volFouille.toFixed(1)}m³ | Cuves: {volCuves.toFixed(1)}m³ | Remblais: {volRemblais.toFixed(1)}m³</p>}{sel.prixHT>0&&<p className="font-bold text-rose text-xs">{sel.prixHT}€ HT</p>}</div></div>}
             </>)}
@@ -529,7 +573,66 @@ export default function NewDevis() {
                 <div className="grid grid-cols-3 gap-2"><div><label className="text-[9px] text-gray-600">Câble élec (ml) *</label><input type="number" value={form.longueurCableElec} onChange={e=>set('longueurCableElec',e.target.value)} min="0" className={`${inp} ${!form.longueurCableElec?'border-red-500/40 ring-1 ring-red-500/20':''}`} placeholder="obligatoire"/></div><div><label className="text-[9px] text-gray-600">Section câble</label><select value={form.sectionCable} onChange={e=>set('sectionCable',e.target.value)} className={inp}><option value="2.5">2,5 mm² ({tarifsMateriaux?.cableElec25Ml||6}€/ml)</option><option value="4">4 mm² ({tarifsMateriaux?.cableElec4Ml||8}€/ml)</option><option value="6">6 mm² ({tarifsMateriaux?.cableElec6Ml||12}€/ml)</option></select></div><div><label className="text-[9px] text-gray-600">Fourreau</label><p className="h-9 flex items-center text-sm text-gray-400">{fmtC(tarifsMateriaux?.fourreauElec||25)}</p></div></div>{coutElec>0&&<p className="text-[9px] text-gray-500">Total élec : {fmtC(coutElec)} <span className="text-gray-600">(câble {prixCableMl}€/ml × {form.longueurCableElec}ml + fourreau {fmtC(tarifsMateriaux?.fourreauElec||25)})</span></p>}</div>}
             </div>
 
-            {/* ÉPANDAGE */}
+            {/* BLOCS À BANCHER (aérien/semi-enterré) */}
+            {isAerien&&sel&&<div className="border-t border-white/5 pt-3 bg-orange-500/5 border border-orange-500/15 rounded p-3">
+              <label className={lbl}>🧱 Blocs à bancher — habillage aérien</label>
+              {blocsAerien ? (<>
+                <div className="grid grid-cols-4 gap-1 mb-2 text-[10px]">{[
+                  ['Emprise ext.',`${blocsAerien.emprise.longueurExt}×${blocsAerien.emprise.largeurExt}m`],
+                  ['Hauteur mur',`${blocsAerien.emprise.hauteurMur}m (${blocsAerien.blocs.nbRangs} rangs)`],
+                  ['Blocs droits',`${blocsAerien.blocs.totalBlocsDroits}`],
+                  ['Blocs angle',`${blocsAerien.blocs.totalBlocsAngle}`],
+                  ['Total blocs',`${blocsAerien.blocs.totalBlocs}`],
+                  ['Béton rempl.',`${blocsAerien.blocs.volBeton} m³`],
+                  ['Fer T10',`${blocsAerien.blocs.mlFerTotal} ml (${blocsAerien.blocs.poidsFer} kg)`],
+                  ['Barres 6m',`${blocsAerien.blocs.nbBarres6m}`],
+                ].map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className="text-orange-300 font-medium">{v}</p></div>)}</div>
+                <div className="grid grid-cols-4 gap-2 mb-2">
+                  <div><label className="text-[9px] text-gray-600">Prix bloc droit (€)</label><input type="number" value={form.prixBlocBancher} onChange={e=>set('prixBlocBancher',e.target.value)} step="0.10" className={inp}/></div>
+                  <div><label className="text-[9px] text-gray-600">Prix bloc angle (€)</label><input type="number" value={form.prixBlocAngle} onChange={e=>set('prixBlocAngle',e.target.value)} step="0.10" className={inp}/></div>
+                  <div><label className="text-[9px] text-gray-600">Béton (€/m³)</label><input type="number" value={form.prixBetonBlocM3} onChange={e=>set('prixBetonBlocM3',e.target.value)} step="5" className={inp}/></div>
+                  <div><label className="text-[9px] text-gray-600">Fer T10 (€/kg)</label><input type="number" value={form.prixFerT10Kg} onChange={e=>set('prixFerT10Kg',e.target.value)} step="0.10" className={inp}/></div>
+                </div>
+                <div className="grid grid-cols-4 gap-1 text-[10px]">{[
+                  ['Blocs droits',`${blocsAerien.blocs.totalBlocsDroits} × ${blocsAerien.couts.prixBloc}€ = ${blocsAerien.couts.coutBlocsDroits}€`],
+                  ['Blocs angle',`${blocsAerien.blocs.totalBlocsAngle} × ${blocsAerien.couts.prixBlocAngle}€ = ${blocsAerien.couts.coutBlocsAngle}€`],
+                  ['Béton',`${blocsAerien.blocs.volBeton}m³ × ${blocsAerien.couts.prixBetonM3}€ = ${blocsAerien.couts.coutBeton}€`],
+                  ['Ferraillage',`${blocsAerien.blocs.poidsFer}kg × ${blocsAerien.couts.prixFerKg}€ = ${blocsAerien.couts.coutFer}€`],
+                ].map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className="text-white font-medium">{v}</p></div>)}</div>
+                <p className="text-xs text-orange-400 font-bold mt-2 text-right">Total habillage : {fmtC(blocsAerien.couts.coutTotal)}</p>
+              </>) : <p className="text-[10px] text-gray-500">Sélectionnez un produit ANC pour voir le calcul</p>}
+            </div>}
+
+            {/* MUR DE SOUTÈNEMENT */}
+            <div className="border-t border-white/5 pt-3">
+              <label className="flex items-center space-x-2 cursor-pointer mb-2"><input type="checkbox" checked={form.murSoutenement} onChange={e=>set('murSoutenement',e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-600 text-rose bg-bg-input"/><span className="text-xs font-medium text-gray-300">🧱 Mur de soutènement</span></label>
+              {form.murSoutenement&&<div className="ml-6 bg-purple-500/5 border border-purple-500/15 rounded p-3 space-y-2">
+                <div className="grid grid-cols-3 gap-2">
+                  <div><label className="text-[9px] text-gray-600">Longueur (m) *</label><input type="number" value={form.murLongueur} onChange={e=>set('murLongueur',e.target.value)} step="0.5" min="0" className={inp} placeholder="ex: 6"/></div>
+                  <div><label className="text-[9px] text-gray-600">Hauteur (m) *</label><input type="number" value={form.murHauteur} onChange={e=>set('murHauteur',e.target.value)} step="0.2" min="0" className={inp} placeholder="ex: 1.20"/></div>
+                  <div><label className="text-[9px] text-gray-600">Épaisseur (m)</label><select value={form.murEpaisseur} onChange={e=>set('murEpaisseur',e.target.value)} className={inp}><option value="0.20">20 cm (standard)</option><option value="0.27">27 cm (renforcé)</option></select></div>
+                </div>
+                <label className="flex items-center space-x-2 cursor-pointer"><input type="checkbox" checked={form.murFondation} onChange={e=>set('murFondation',e.target.checked)} className="w-3 h-3 rounded border-gray-600 text-purple-400 bg-bg-input"/><span className="text-[10px] text-gray-400">Semelle de fondation</span></label>
+                {form.murFondation&&<div className="grid grid-cols-2 gap-2 ml-5">
+                  <div><label className="text-[9px] text-gray-600">Largeur fondation (m)</label><input type="number" value={form.murFondLargeur} onChange={e=>set('murFondLargeur',e.target.value)} step="0.05" className={inp}/></div>
+                  <div><label className="text-[9px] text-gray-600">Hauteur fondation (m)</label><input type="number" value={form.murFondHauteur} onChange={e=>set('murFondHauteur',e.target.value)} step="0.05" className={inp}/></div>
+                </div>}
+                {murData&&<div className="mt-2 space-y-1">
+                  <div className="grid grid-cols-4 gap-1 text-[10px]">{[
+                    ['Rangs',`${murData.nbRangs} (${murData.hauteur}m)`],
+                    ['Blocs',`${murData.totalBlocs}`],
+                    ['Béton mur',`${murData.volBetonMur} m³`],
+                    murData.fondation&&['Béton fondation',`${murData.volBetonFondation} m³`],
+                    ['Béton total',`${murData.volBetonTotal} m³`],
+                    ['Fer T10',`${murData.mlFerTotal} ml (${murData.poidsFer}kg)`],
+                    ['Barres 6m',`${murData.nbBarres6m}`],
+                    ['TOTAL',fmtC(murData.couts.coutTotal)],
+                  ].filter(Boolean).map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className={`font-medium ${l==='TOTAL'?'text-purple-400':'text-white'}`}>{v}</p></div>)}</div>
+                </div>}
+              </div>}
+            </div>
+
+                        {/* ÉPANDAGE */}
             {hasEpandage(form.typeInstallation)&&<div className="border-t border-white/5 pt-3 bg-blue-500/5 border border-blue-500/15 rounded p-3"><label className={lbl}>🌿 Épandage (DT 64.1)</label><div className="grid grid-cols-2 gap-2"><div><label className="text-[9px] text-gray-600">Surface épandage (m²)</label><input type="number" value={form.epandageSurface} onChange={e=>set('epandageSurface',e.target.value)} min="0" step="1" className={inp} placeholder="ex: 15"/></div><div><label className="text-[9px] text-gray-600">Nb drains (auto si vide)</label><input type="number" value={form.epandageNbDrains} onChange={e=>set('epandageNbDrains',e.target.value)} min="0" className={inp} placeholder="auto"/></div></div>
               {epandageData&&<div className="mt-2 space-y-1 text-[10px]"><div className="grid grid-cols-3 gap-1">{[['Drains',`${epandageData.nbDrains} × ${epandageData.longueurParDrain}ml`],['Total drains',`${epandageData.longueurDrainTotal} ml`],['Gravier 20/40',`${epandageData.volumeGravier} m³`],['Terre évacuée',`${epandageData.terreEvacuee} m³`],['Foisonné ép.',`${epandageData.foisonneEpandage} m³`],['Coût ép.',fmtC(coutEpandage)]].map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className="text-white font-medium">{v}</p></div>)}</div></div>}
             </div>}
@@ -639,7 +742,7 @@ export default function NewDevis() {
                 <div className="flex items-center justify-between mb-3"><h3 className={`text-sm font-bold ${scText[sc.scenarioId]||'text-white'}`}>{sc.scenarioNom}</h3></div>
                 <div className="grid grid-cols-3 gap-1.5 mb-3">{[{l:'Terrassement',v:`${sc.joursEngin||1}j (${sc.hExcav||'?'}h excav.)`},{l:'Voyages évac.',v:`${sc.nbVoyages}`},{l:'Vol. foisonné',v:`${sc.volFoison?.toFixed(1)||'?'}m³`}].map(i=><div key={i.l} className="bg-black/20 rounded p-1.5"><p className="text-[8px] text-gray-600">{i.l}</p><p className="text-[10px] font-medium text-white">{i.v}</p></div>)}</div>
                 <div className="space-y-1 text-[10px]">
-                  {[['⛏️ Terrassement',sc.coutTerrassementClient],['🚛 Évacuation (km+chauffeur+attente)',sc.coutTransportClient],sc.coutMortierTranspClient>0&&['🏗️ Transport mortier',sc.coutMortierTranspClient],sc.coutMortierMatiere>0&&[`🏗️ Mortier matière (${sc.volMortier?.toFixed(2)||0}m³)`,sc.coutMortierMatiere],sc.coutLivraisonClient>0&&['📦 Livraison matériaux',sc.coutLivraisonClient],[sel?.nom||'Matériel ANC',sc.coutMateriel],sc.coutProduitsSup>0&&['Produits suppl.',sc.coutProduitsSup],['Fournitures',sc.coutAssocies],coutCoudes>0&&['Coudes PVC',coutCoudes],coutRehausses>0&&['Rehausses',coutRehausses],coutElec>0&&['Électrique',coutElec],coutEpandage>0&&['Épandage',coutEpandage],coutTerreVegetale>0&&['Terre vég.',coutTerreVegetale],["👷 Pose",sc.coutPoseur],['Dossier photo',COUT_DOSSIER_PHOTO]].filter(Boolean).map(([l,v])=>(<div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="text-gray-300">{fmtC(v)}</span></div>))}
+                  {[['⛏️ Terrassement',sc.coutTerrassementClient],['🚛 Évacuation (km+chauffeur+attente)',sc.coutTransportClient],sc.coutMortierTranspClient>0&&['🏗️ Transport mortier',sc.coutMortierTranspClient],sc.coutMortierMatiere>0&&[`🏗️ Mortier matière (${sc.volMortier?.toFixed(2)||0}m³)`,sc.coutMortierMatiere],sc.coutLivraisonClient>0&&['📦 Livraison matériaux',sc.coutLivraisonClient],[sel?.nom||'Matériel ANC',sc.coutMateriel],sc.coutProduitsSup>0&&['Produits suppl.',sc.coutProduitsSup],['Fournitures',sc.coutAssocies],coutCoudes>0&&['Coudes PVC',coutCoudes],coutRehausses>0&&['Rehausses',coutRehausses],coutElec>0&&['Électrique',coutElec],coutEpandage>0&&['Épandage',coutEpandage],coutBlocsAerien>0&&['🧱 Habillage aérien',coutBlocsAerien],coutMurSoutenement>0&&['🧱 Mur soutènement',coutMurSoutenement],coutTerreVegetale>0&&['Terre vég.',coutTerreVegetale],["👷 Pose",sc.coutPoseur],['Dossier photo',COUT_DOSSIER_PHOTO]].filter(Boolean).map(([l,v])=>(<div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="text-gray-300">{fmtC(v)}</span></div>))}
                   {sc.montantRemise>0&&<div className="flex justify-between text-green-400 font-bold"><span>Remise {form.remiseType==='pourcent'?form.remisePourcent+'%':''}</span><span>- {fmtC(sc.montantRemise)}</span></div>}
                   <div className="flex justify-between pt-1 border-t border-white/10 font-bold"><span className="text-white">Total HT</span><span className="text-white">{fmtC(sc.totalHT)}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">TVA 20%</span><span>{fmtC(sc.totalTVA)}</span></div>
