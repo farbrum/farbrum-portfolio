@@ -1,0 +1,9 @@
+{
+  "name": "F.Arbrum",
+  "short_name": "F.Arbrum",
+  "description": "Gestion de devis d'assainissement",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0a0a0a",
+  "theme_color": "#C8509B"
+}
