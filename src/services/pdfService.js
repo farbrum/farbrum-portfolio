@@ -399,7 +399,7 @@ function genFicheTechnique(doc, devis) {
     if(mo.hRestauration>0)moRows.push({_cells:['Restauration pelouse',`${mo.hRestauration}h`]})
     moRows.push({_footer:true,_bold:true,_cells:[`Total poseur (×${mo.nbPoseurs} sur site)`,`${mo.hPoseDuree}h → coût ${mo.hPoseCout}h`]})
     moRows.push({_footer:true,_bold:true,_cells:['Durée totale chantier',`${mo.totalH}h — ${mo.totalJours} jour(s)`]})
-    y=drawTable(doc,14,y,[130,50],moRows)
+    y=drawTable(doc,14,y,[115,65],moRows)
   }
 
   // Fournitures associées
@@ -536,7 +536,50 @@ function genCGV(doc) {
 }
 
 // ===== FICHE POSEUR (PDF séparé avec QR + procédure) =====
-function genFichePoseur(doc, devis, qrDataUrl) {
+async function fetchStaticMapImage(lat, lng, zoom=15, w=400, h=250) {
+  // Utilise OpenStreetMap static tiles via un canvas
+  try {
+    const tileUrl = (x,y,z) => `https://tile.openstreetmap.org/${z}/${x}/${y}.png`
+    // Calcul tile coords
+    const n = Math.pow(2, zoom)
+    const xtile = Math.floor((lng + 180) / 360 * n)
+    const ytile = Math.floor((1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n)
+    // Créer un canvas pour assembler les tiles
+    const canvas = document.createElement('canvas')
+    canvas.width = w; canvas.height = h
+    const ctx = canvas.getContext('2d')
+    ctx.fillStyle = '#e8e0d8'; ctx.fillRect(0,0,w,h)
+    // Pixel offset du centre
+    const xFrac = (lng + 180) / 360 * n - xtile
+    const yFrac = (1 - Math.log(Math.tan(lat * Math.PI / 180) + 1 / Math.cos(lat * Math.PI / 180)) / Math.PI) / 2 * n - ytile
+    const cx = w/2, cy = h/2
+    const ox = cx - xFrac * 256, oy = cy - yFrac * 256
+    // Charger 3x3 tiles autour du centre
+    const tiles = []
+    for(let dy = -1; dy <= 1; dy++){
+      for(let dx = -1; dx <= 1; dx++){
+        tiles.push({x: xtile+dx, y: ytile+dy, px: ox + dx*256, py: oy + dy*256})
+      }
+    }
+    await Promise.all(tiles.map(t => new Promise((resolve) => {
+      const img = new Image()
+      img.crossOrigin = 'anonymous'
+      img.onload = () => { ctx.drawImage(img, t.px, t.py, 256, 256); resolve() }
+      img.onerror = () => resolve()
+      img.src = tileUrl(t.x, t.y, zoom)
+    })))
+    // Dessiner marqueur au centre
+    ctx.beginPath(); ctx.arc(cx, cy-12, 8, 0, Math.PI*2); ctx.fillStyle='#c33879'; ctx.fill()
+    ctx.strokeStyle='white'; ctx.lineWidth=2; ctx.stroke()
+    ctx.beginPath(); ctx.moveTo(cx-5,cy-5); ctx.lineTo(cx,cy+4); ctx.lineTo(cx+5,cy-5); ctx.fillStyle='#c33879'; ctx.fill()
+    // Attribution OSM
+    ctx.fillStyle='rgba(255,255,255,0.8)'; ctx.fillRect(w-130,h-14,130,14)
+    ctx.fillStyle='#333'; ctx.font='9px sans-serif'; ctx.fillText('© OpenStreetMap',w-125,h-3)
+    return canvas.toDataURL('image/png')
+  } catch(e) { console.warn('Map generation failed:', e); return null }
+}
+
+function genFichePoseur(doc, devis, qrDataUrl, mapDataUrl) {
   // NOTE: on écrit directement sur la page 1 (déjà créée par new jsPDF)
   drawBorder(doc)
   let y = 12
@@ -579,6 +622,25 @@ function genFichePoseur(doc, devis, qrDataUrl) {
   }
   y+=blocH+4
 
+  // Carte de localisation (si GPS et image carte disponible)
+  if(mapDataUrl && gpsLat){
+    y=ck(doc,y,60)
+    doc.setFontSize(9);doc.setFont(undefined,'bold');doc.setTextColor(...ROSE)
+    doc.text('LOCALISATION DU CHANTIER',105,y,{align:'center'});y+=3
+    try{
+      // Image carte centrée, ratio ~1.6:1
+      const mapW=130, mapH=80
+      const mapX=(210-mapW)/2
+      doc.addImage(mapDataUrl,'PNG',mapX,y,mapW,mapH)
+      // Cadre autour de la carte
+      doc.setDrawColor(...ROSE);doc.setLineWidth(0.4);doc.rect(mapX,y,mapW,mapH)
+      y+=mapH+2
+      doc.setFontSize(7);doc.setFont(undefined,'italic');doc.setTextColor(120,120,120)
+      doc.text(`Coordonnees : ${Number(gpsLat).toFixed(5)}, ${Number(gpsLng).toFixed(5)}`,105,y,{align:'center'})
+      y+=5
+    }catch(e){console.warn('Map image insert failed:',e); y+=2}
+  }
+
   // Procédure de connexion
   y=secH(doc,y,'PROCEDURE D\'ACCES AU DOSSIER TECHNIQUE')
   doc.setFillColor(252,245,248);doc.roundedRect(12,y,186,38,2,2,'F')
@@ -614,6 +676,35 @@ function genFichePoseur(doc, devis, qrDataUrl) {
   genFicheTechnique(doc, devis)
 }
 
+// ===== Merge PDF fabricant (annexe produit) =====
+async function mergeFabricantPdf(jspdfDoc, fabricantPdfData) {
+  if(!fabricantPdfData) return jspdfDoc
+  try {
+    const { PDFDocument } = await import('pdf-lib')
+    // Convertir jsPDF en bytes
+    const mainBytes = jspdfDoc.output('arraybuffer')
+    const mainPdf = await PDFDocument.load(mainBytes)
+    // Charger le PDF fabricant (base64 data URL ou raw base64)
+    let fabBytes
+    if(fabricantPdfData.startsWith('data:')){
+      const b64 = fabricantPdfData.split(',')[1]
+      fabBytes = Uint8Array.from(atob(b64), c => c.charCodeAt(0))
+    } else {
+      fabBytes = Uint8Array.from(atob(fabricantPdfData), c => c.charCodeAt(0))
+    }
+    const fabPdf = await PDFDocument.load(fabBytes)
+    // Copier toutes les pages du PDF fabricant
+    const copiedPages = await mainPdf.copyPages(fabPdf, fabPdf.getPageIndices())
+    copiedPages.forEach(page => mainPdf.addPage(page))
+    // Sauvegarder le PDF fusionné
+    const mergedBytes = await mainPdf.save()
+    return mergedBytes
+  } catch(e) {
+    console.warn('Merge PDF fabricant failed:', e)
+    return jspdfDoc
+  }
+}
+
 export const pdfService = {
   // Génère un PDF CLIENT : scénario + fiche technique produit + CGV (SANS fiche technique chantier)
   genererDevisPDF(devis, scenarioIdx=0) {
@@ -644,30 +735,79 @@ export const pdfService = {
     } catch(err){ console.error('Erreur PDF combiné:',err); alert('Erreur PDF combiné : '+err.message); return null }
   },
 
-  // Génère un PDF POSEUR : dossier installateur + QR code + procédure + fiche technique chantier
+  // Génère un PDF POSEUR : dossier installateur + carte + QR code + procédure + fiche technique chantier
   async genererFichePoseurPDF(devis) {
     try {
       const { generateQRDataUrl, buildChantierUrl } = await import('../components/QRCode')
       const baseUrl = typeof window !== 'undefined' ? window.location.origin : 'https://app.farbrum.fr'
       const url = buildChantierUrl(baseUrl, devis.id)
       const qrDataUrl = await generateQRDataUrl(url, 200)
+      // Charger la carte statique si GPS disponible
+      let mapDataUrl = null
+      const gpsLat = devis.gpsAnc?.lat || devis.gpsAncLat || null
+      const gpsLng = devis.gpsAnc?.lng || devis.gpsAncLng || null
+      if(gpsLat && gpsLng){
+        try { mapDataUrl = await fetchStaticMapImage(Number(gpsLat), Number(gpsLng), 15, 600, 380) } catch(e){ console.warn('Map fetch failed:', e) }
+      }
       const doc = new jsPDF()
       drawBorder(doc)
-      genFichePoseur(doc, devis, qrDataUrl)
+      genFichePoseur(doc, devis, qrDataUrl, mapDataUrl)
       const pages=doc.internal.getNumberOfPages()
       for(let i=1;i<=pages;i++){doc.setPage(i);drawBorder(doc);drawPageNum(doc,i,pages);drawFooter(doc)}
       return doc
     } catch(err){ console.error('Erreur PDF poseur:',err); alert('Erreur PDF poseur : '+err.message); return null }
   },
 
-  telechargerPDF(d,i=0){const doc=this.genererDevisPDF(d,i);if(!doc)return;const s=d.scenarios?.length>1?'_'+(d.scenarios[i]?.scenarioId||i):'';doc.save(`Devis_${d.numeroDevis||'X'}${s}.pdf`)},
-  ouvrirPDF(d,i=0){const doc=this.genererDevisPDF(d,i);if(!doc)return;try{const b=doc.output('blob'),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u)},1000)}catch(e){this.telechargerPDF(d,i)}},
+  telechargerPDF: async function(d,i=0){
+    const doc=this.genererDevisPDF(d,i);if(!doc)return
+    const fabPdf = d.produitPdfLocal || d.produitPdfUrl || null
+    if(fabPdf){
+      try{
+        const merged = await mergeFabricantPdf(doc, fabPdf)
+        if(merged instanceof ArrayBuffer || merged instanceof Uint8Array){
+          const blob=new Blob([merged],{type:'application/pdf'})
+          const url=URL.createObjectURL(blob)
+          const a=document.createElement('a');a.href=url;a.download=`Devis_${d.numeroDevis||'X'}${d.scenarios?.length>1?'_'+(d.scenarios[i]?.scenarioId||i):''}.pdf`
+          document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},1000);return
+        }
+      }catch(e){console.warn('Merge failed, using base PDF:',e)}
+    }
+    const s=d.scenarios?.length>1?'_'+(d.scenarios[i]?.scenarioId||i):'';doc.save(`Devis_${d.numeroDevis||'X'}${s}.pdf`)
+  },
+  ouvrirPDF: async function(d,i=0){
+    const doc=this.genererDevisPDF(d,i);if(!doc)return
+    const fabPdf = d.produitPdfLocal || d.produitPdfUrl || null
+    if(fabPdf){
+      try{
+        const merged = await mergeFabricantPdf(doc, fabPdf)
+        if(merged instanceof ArrayBuffer || merged instanceof Uint8Array){
+          const blob=new Blob([merged],{type:'application/pdf'})
+          const url=URL.createObjectURL(blob)
+          const a=document.createElement('a');a.href=url;a.target='_blank';a.rel='noopener'
+          document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},1000);return
+        }
+      }catch(e){console.warn('Merge failed, using base PDF:',e)}
+    }
+    try{const b=doc.output('blob'),u=URL.createObjectURL(b),a=document.createElement('a');a.href=u;a.target='_blank';a.rel='noopener';document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(u)},1000)}catch(e){await this.telechargerPDF(d,i)}
+  },
   telechargerTousScenarios(d){if(!d.scenarios)return;d.scenarios.forEach((_,i)=>setTimeout(()=>this.telechargerPDF(d,i),i*600))},
 
   // Combiner tous les scénarios dans un seul PDF
-  combinerPDF(d){
+  async combinerPDF(d){
     const doc=this.genererCombinePDF(d)
     if(!doc)return
+    const fabPdf = d.produitPdfLocal || d.produitPdfUrl || null
+    if(fabPdf){
+      try{
+        const merged = await mergeFabricantPdf(doc, fabPdf)
+        if(merged instanceof ArrayBuffer || merged instanceof Uint8Array){
+          const blob=new Blob([merged],{type:'application/pdf'})
+          const url=URL.createObjectURL(blob)
+          const a=document.createElement('a');a.href=url;a.download=`Devis_${d.numeroDevis||'X'}_COMPLET.pdf`
+          document.body.appendChild(a);a.click();setTimeout(()=>{document.body.removeChild(a);URL.revokeObjectURL(url)},1000);return
+        }
+      }catch(e){console.warn('Merge failed:',e)}
+    }
     doc.save(`Devis_${d.numeroDevis||'X'}_COMPLET.pdf`)
   },
 
