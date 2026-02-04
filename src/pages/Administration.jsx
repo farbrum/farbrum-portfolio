@@ -1,7 +1,8 @@
-import { useState, useRef } from 'react'
-import { Database, Download, Upload, Settings, Trash2, Shield, CheckCircle, AlertTriangle, Users, DollarSign, Wrench, Plus } from 'lucide-react'
+import { useState, useRef, useEffect } from 'react'
+import { Database, Download, Upload, Settings, Trash2, Shield, CheckCircle, AlertTriangle, Users, DollarSign, Wrench, Plus, Eye, EyeOff, Key, UserPlus, Lock } from 'lucide-react'
 import { useProductStore } from '../store/productStore'
 import { useDevisStore } from '../store/devisStore'
+import { useAuthStore } from '../store/authStore'
 import Window from '../components/Window'
 
 export default function Administration() {
@@ -10,6 +11,11 @@ export default function Administration() {
 
   const { categories, fournisseurs, produits, vehicules, ressources, tarifsMateriaux, updateTarifs, tarifsChantier, updateTarifsChantier, addRessource, updateRessource, deleteRessource, enginsData, updateEngin, addEngin, deleteEngin } = useProductStore()
   const { devis } = useDevisStore()
+  const { users, codeEntreprise, setCodeEntreprise, addUser, updateUser, deleteUser, init: initAuth } = useAuthStore()
+  const [showPasswords, setShowPasswords] = useState({})
+  const [newUser, setNewUser] = useState(null)
+
+  useEffect(() => { initAuth() }, [])
 
   // ===== EXPORT =====
   const exportData = () => {
@@ -348,52 +354,228 @@ export default function Administration() {
           </Window>
         </div>
 
-        {/* SÉCURITÉ — Code entreprise & identifiants */}
-        <Window title="Sécurité & Accès" icon={Shield}>
-          <div className="p-5 space-y-4">
-            {/* Code entreprise */}
-            <div>
-              <label className="text-[10px] text-gray-500 uppercase font-semibold mb-1 block">Code d'accès entreprise (1er verrou)</label>
-              <div className="flex items-center space-x-2">
-                <input
-                  type="text"
-                  defaultValue={localStorage.getItem('farbrum-code-entreprise') || 'FARB2025'}
-                  id="codeEntreprise"
-                  className="flex-1 h-8 px-3 bg-bg-input border border-white/10 rounded text-sm text-white font-mono uppercase"
-                />
-                <button
-                  onClick={() => {
-                    const val = document.getElementById('codeEntreprise').value.trim()
-                    if (val.length < 4) { setMsg({type:'err',text:'Le code doit faire au moins 4 caractères'}); return }
-                    localStorage.setItem('farbrum-code-entreprise', val.toUpperCase())
-                    setMsg({type:'ok',text:'Code entreprise mis à jour !'})
-                    setTimeout(() => setMsg(null), 3000)
-                  }}
-                  className="h-8 px-4 bg-rose/10 hover:bg-rose/20 text-rose text-xs font-semibold rounded border border-rose/25"
-                >
-                  Modifier
-                </button>
-              </div>
-              <p className="text-[8px] text-gray-600 mt-1">Ce code est demandé à tous les utilisateurs avant l'écran de connexion. Partagez-le uniquement avec vos collaborateurs.</p>
-            </div>
+        {/* SÉCURITÉ — Panneau complet de gestion des accès */}
+        <div className="md:col-span-2">
+          <Window title="Sécurité & Gestion des accès" icon={Shield}>
+            <div className="p-5 space-y-6">
 
-            <div className="border-t border-white/5" />
+              {/* ─── Code entreprise (1er verrou) ─── */}
+              <div>
+                <div className="flex items-center space-x-2 mb-3">
+                  <Lock size={16} className="text-rose" />
+                  <h3 className="text-sm font-bold text-white">Code d'accès entreprise</h3>
+                  <span className="text-[8px] px-2 py-0.5 rounded bg-rose/10 text-rose border border-rose/20">1er VERROU</span>
+                </div>
+                <div className="bg-bg-input border border-white/10 rounded-lg p-4">
+                  <div className="flex items-center space-x-3">
+                    <div className="flex-1">
+                      <label className="text-[9px] text-gray-500 uppercase mb-1 block">Code actuel</label>
+                      <input
+                        type="text"
+                        id="codeEntreprise"
+                        defaultValue={codeEntreprise}
+                        className="w-full h-10 px-3 bg-white/5 border border-white/10 rounded text-sm text-white font-mono uppercase tracking-widest"
+                      />
+                    </div>
+                    <button
+                      onClick={async () => {
+                        const val = document.getElementById('codeEntreprise').value.trim()
+                        if (val.length < 4) { setMsg({type:'err',text:'Le code doit faire au moins 4 caractères'}); return }
+                        await setCodeEntreprise(val)
+                        setMsg({type:'ok',text:'Code entreprise mis à jour : ' + val.toUpperCase()})
+                        setTimeout(() => setMsg(null), 3000)
+                      }}
+                      className="h-10 px-5 bg-rose/10 hover:bg-rose/20 text-rose text-xs font-semibold rounded border border-rose/25 mt-4"
+                    >
+                      Modifier
+                    </button>
+                  </div>
+                  <p className="text-[8px] text-gray-600 mt-2">Ce code est demandé avant l'écran de connexion. Partagez-le uniquement avec vos collaborateurs autorisés.</p>
+                </div>
+              </div>
 
-            {/* Info poseur */}
-            <div>
-              <p className="text-[10px] text-gray-500 uppercase font-semibold mb-1">Accès poseur</p>
-              <div className="bg-emerald-500/5 border border-emerald-500/15 rounded p-3">
-                <p className="text-xs text-emerald-400 font-medium">🔒 Accès QR Code + PIN uniquement</p>
-                <p className="text-[9px] text-gray-400 mt-1">Les poseurs n'accèdent qu'à leur fiche chantier via le QR code. Ils ne peuvent pas voir les devis, produits ou paramètres.</p>
+              <div className="border-t border-white/5" />
+
+              {/* ─── Utilisateurs (2ème verrou) ─── */}
+              <div>
+                <div className="flex items-center justify-between mb-3">
+                  <div className="flex items-center space-x-2">
+                    <Key size={16} className="text-amber-400" />
+                    <h3 className="text-sm font-bold text-white">Comptes utilisateurs</h3>
+                    <span className="text-[8px] px-2 py-0.5 rounded bg-amber-500/10 text-amber-400 border border-amber-500/20">2ème VERROU</span>
+                  </div>
+                  <button
+                    onClick={() => setNewUser({ email: '', password: '', nom: '', prenom: '', role: 'admin' })}
+                    className="flex items-center space-x-1 px-3 py-1.5 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/25"
+                  >
+                    <UserPlus size={12} />
+                    <span>Ajouter</span>
+                  </button>
+                </div>
+
+                <div className="space-y-2">
+                  {users.map(user => (
+                    <div key={user.id} className="bg-bg-input border border-white/10 rounded-lg p-4">
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                        {/* Nom */}
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Nom</label>
+                          <input
+                            type="text"
+                            value={user.nom}
+                            onChange={e => updateUser(user.id, { nom: e.target.value })}
+                            className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white"
+                          />
+                        </div>
+                        {/* Email */}
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Email</label>
+                          <input
+                            type="email"
+                            value={user.email}
+                            onChange={e => updateUser(user.id, { email: e.target.value })}
+                            className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white"
+                          />
+                        </div>
+                        {/* Mot de passe */}
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Mot de passe</label>
+                          <div className="relative">
+                            <input
+                              type={showPasswords[user.id] ? 'text' : 'password'}
+                              value={user.password}
+                              onChange={e => updateUser(user.id, { password: e.target.value })}
+                              className="w-full h-8 px-2 pr-8 bg-white/5 border border-white/10 rounded text-xs text-white font-mono"
+                            />
+                            <button
+                              onClick={() => setShowPasswords(p => ({ ...p, [user.id]: !p[user.id] }))}
+                              className="absolute right-2 top-1/2 -translate-y-1/2 text-gray-600 hover:text-white"
+                            >
+                              {showPasswords[user.id] ? <EyeOff size={12} /> : <Eye size={12} />}
+                            </button>
+                          </div>
+                        </div>
+                        {/* Rôle */}
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Rôle</label>
+                          <select
+                            value={user.role}
+                            onChange={e => updateUser(user.id, { role: e.target.value })}
+                            className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white"
+                          >
+                            <option value="admin">👑 Admin</option>
+                            <option value="ouvrier">🔧 Consultation</option>
+                          </select>
+                        </div>
+                        {/* Supprimer */}
+                        <div className="flex items-end">
+                          {users.length > 1 && (
+                            <button
+                              onClick={() => {
+                                if (confirm(`Supprimer le compte de ${user.nom} ?`)) deleteUser(user.id)
+                              }}
+                              className="h-8 px-3 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs rounded border border-red-500/25 flex items-center space-x-1"
+                            >
+                              <Trash2 size={11} />
+                              <span>Supprimer</span>
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+
+                  {/* Formulaire nouvel utilisateur */}
+                  {newUser && (
+                    <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-lg p-4">
+                      <p className="text-xs font-bold text-emerald-400 mb-3">Nouveau compte</p>
+                      <div className="grid grid-cols-1 sm:grid-cols-5 gap-3 items-end">
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Nom</label>
+                          <input type="text" value={newUser.nom} onChange={e => setNewUser(n => ({...n, nom: e.target.value}))} placeholder="Nom" className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white" />
+                        </div>
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Email</label>
+                          <input type="email" value={newUser.email} onChange={e => setNewUser(n => ({...n, email: e.target.value}))} placeholder="email@..." className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white" />
+                        </div>
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Mot de passe</label>
+                          <input type="text" value={newUser.password} onChange={e => setNewUser(n => ({...n, password: e.target.value}))} placeholder="Min. 6 car." className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white font-mono" />
+                        </div>
+                        <div>
+                          <label className="text-[8px] text-gray-500 uppercase">Rôle</label>
+                          <select value={newUser.role} onChange={e => setNewUser(n => ({...n, role: e.target.value}))} className="w-full h-8 px-2 bg-white/5 border border-white/10 rounded text-xs text-white">
+                            <option value="admin">👑 Admin</option>
+                            <option value="ouvrier">🔧 Consultation</option>
+                          </select>
+                        </div>
+                        <div className="flex items-end space-x-2">
+                          <button
+                            onClick={async () => {
+                              if (!newUser.email || !newUser.password || newUser.password.length < 6) {
+                                setMsg({type:'err', text:'Email requis et mot de passe min. 6 caractères'})
+                                return
+                              }
+                              await addUser(newUser)
+                              setNewUser(null)
+                              setMsg({type:'ok', text:'Compte créé avec succès !'})
+                              setTimeout(() => setMsg(null), 3000)
+                            }}
+                            className="h-8 px-3 bg-emerald-500/20 text-emerald-400 text-xs font-semibold rounded border border-emerald-500/30"
+                          >
+                            ✓ Créer
+                          </button>
+                          <button onClick={() => setNewUser(null)} className="h-8 px-3 bg-white/5 text-gray-400 text-xs rounded border border-white/10">
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="border-t border-white/5" />
+
+              {/* ─── Info poseur ─── */}
+              <div>
+                <div className="flex items-center space-x-2 mb-2">
+                  <Users size={16} className="text-emerald-400" />
+                  <h3 className="text-sm font-bold text-white">Accès poseur</h3>
+                  <span className="text-[8px] px-2 py-0.5 rounded bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">QR CODE</span>
+                </div>
+                <div className="bg-emerald-500/5 border border-emerald-500/15 rounded-lg p-4">
+                  <p className="text-xs text-emerald-400 font-medium mb-1">🔒 Accès séparé et isolé</p>
+                  <p className="text-[9px] text-gray-400">Les poseurs accèdent uniquement à leur fiche chantier via le QR code imprimé sur le devis + leur code PIN personnel. Ils ne peuvent pas voir les devis, produits, prix ou paramètres.</p>
+                </div>
+              </div>
+
+              {/* ─── Résumé sécurité ─── */}
+              <div className="bg-white/[0.02] border border-white/5 rounded-lg p-4">
+                <p className="text-[9px] text-gray-500 uppercase font-semibold mb-2">Architecture de sécurité</p>
+                <div className="space-y-1.5">
+                  <div className="flex items-center space-x-2">
+                    <span className="w-5 h-5 rounded bg-rose/10 text-rose flex items-center justify-center text-[9px] font-bold border border-rose/20">1</span>
+                    <span className="text-[10px] text-gray-300">Code entreprise → bloque les inconnus</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-5 h-5 rounded bg-amber-500/10 text-amber-400 flex items-center justify-center text-[9px] font-bold border border-amber-500/20">2</span>
+                    <span className="text-[10px] text-gray-300">Email + mot de passe → identifie l'utilisateur</span>
+                  </div>
+                  <div className="flex items-center space-x-2">
+                    <span className="w-5 h-5 rounded bg-emerald-500/10 text-emerald-400 flex items-center justify-center text-[9px] font-bold border border-emerald-500/20">3</span>
+                    <span className="text-[10px] text-gray-300">Poseurs → QR code + PIN isolé (pas d'accès admin)</span>
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
-        </Window>
+          </Window>
+        </div>
 
         {/* VERSION */}
         <Window title="Version" icon={Settings}>
           <div className="p-5">
-            <p className="text-sm text-gray-400 mb-3">F.Arbrum v5L — Application Web</p>
+            <p className="text-sm text-gray-400 mb-3">F.Arbrum v6 — Application Web</p>
             <div className="space-y-1.5">
               {['Création de devis (7 étapes)','3 scénarios sol automatiques','Base de données complète','Carte GPS avec recherche','PDF professionnel (logo transparent)','Main d\'œuvre auto-calculée','Restauration surface (terre + graine)','Calendrier de pose disponibilité','Ressources humaines & tarifs','Fiche technique annexe','Combinaison PDF multi-scénarios','Export / Import JSON'].map(t=>(
                 <div key={t} className="flex items-center space-x-2">

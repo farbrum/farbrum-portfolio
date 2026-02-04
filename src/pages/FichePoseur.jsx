@@ -7,7 +7,7 @@ import { Camera, Check, ChevronDown, ChevronUp, Clock, LogOut, Shield, X, Trash2
 import SignaturePad from '../components/SignaturePad'
 
 // ─── Compression photo ───
-function compressImage(dataUrl, maxWidth = 1200, quality = 0.6) {
+function compressImage(dataUrl, maxWidth = 800, quality = 0.4) {
   return new Promise((resolve) => {
     const img = new window.Image()
     img.onload = () => {
@@ -467,7 +467,7 @@ export default function FichePoseur() {
                             {photos.map(photo => (
                               <div key={photo.id} className="relative group">
                                 <img
-                                  src={photo.dataUrl}
+                                  src={photo.photoUrl || photo.dataUrl}
                                   alt=""
                                   className="w-16 h-16 rounded-lg object-cover border border-white/10 cursor-pointer"
                                   onClick={() => setShowPhotoView(photo)}
@@ -770,7 +770,7 @@ export default function FichePoseur() {
           <button className="absolute top-4 right-4 w-10 h-10 bg-white/10 rounded-full flex items-center justify-center z-10">
             <X size={20} className="text-white" />
           </button>
-          <img src={showPhotoView.dataUrl} alt="" className="max-w-full max-h-full object-contain" />
+          <img src={showPhotoView.photoUrl || showPhotoView.dataUrl} alt="" className="max-w-full max-h-full object-contain" />
           <div className="absolute bottom-4 left-4 right-4 text-center">
             <p className="text-xs text-gray-400">{showPhotoView.poseur} — {fmtDate(showPhotoView.timestamp)}</p>
             {showPhotoView.geo && (

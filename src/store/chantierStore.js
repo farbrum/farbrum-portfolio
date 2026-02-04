@@ -1,9 +1,10 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import { storage } from '../services/supabase'
 
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 // PROCÉDURE ANC — Définition des phases et étapes
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
 
 export const PROCEDURE_ANC = [
   {
@@ -49,10 +50,9 @@ export const PROCEDURE_ANC = [
     titre: 'Pose de la cuve',
     icon: '🏗️',
     etapes: [
-      { id: 'cuve_descente', label: 'Descente cuve', type: 'check', description: 'Grue ou pelle, élingues conformes' },
-      { id: 'cuve_photo', label: 'Photo cuve posée', type: 'photo', obligatoire: true, description: 'Cuve dans la fouille, bien positionnée' },
-      { id: 'cuve_niveau', label: 'Vérification niveau/aplomb', type: 'check', description: 'Cuve de niveau dans les 2 sens' },
-      { id: 'cuve_calage', label: 'Calage si nécessaire', type: 'check', description: 'Calage stable sous la cuve' },
+      { id: 'cuve_levage', label: 'Photo levage cuve', type: 'photo', obligatoire: true, description: 'Cuve en phase de mise en fouille' },
+      { id: 'cuve_calage', label: 'Calage & niveau', type: 'check', description: 'Cuve calée, vérification niveau' },
+      { id: 'cuve_posee', label: 'Photo cuve posée', type: 'photo', obligatoire: true, description: 'Cuve en place, de niveau, dans la fouille' },
     ]
   },
   {
@@ -61,82 +61,78 @@ export const PROCEDURE_ANC = [
     titre: 'Raccordements',
     icon: '🔧',
     etapes: [
-      { id: 'racc_entree', label: 'Pose tuyaux PVC entrée', type: 'check', description: 'Pente conforme (1 à 3%)' },
-      { id: 'racc_sortie', label: 'Pose tuyaux PVC sortie', type: 'check', description: 'Raccordement vers exutoire' },
-      { id: 'racc_coudes', label: 'Pose coudes / raccords', type: 'check', description: 'Collage et ajustement' },
-      { id: 'racc_photo', label: 'Photo raccordements', type: 'photo', obligatoire: true, description: 'Vue entrée + sortie' },
-      { id: 'racc_etancheite', label: 'Test étanchéité raccords', type: 'check', description: 'Pas de fuite visible' },
-      { id: 'racc_photo_test', label: 'Photo test étanchéité', type: 'photo', obligatoire: true, description: 'Preuve du test réalisé' },
+      { id: 'racc_entree', label: 'Raccordement entrée', type: 'check', description: 'Raccord collecteur → cuve' },
+      { id: 'racc_sortie', label: 'Raccordement sortie', type: 'check', description: 'Raccord cuve → exutoire' },
+      { id: 'racc_photo', label: 'Photo raccordements', type: 'photo', obligatoire: true, description: 'Tous les raccords visibles' },
+      { id: 'racc_ventilation', label: 'Mise en place ventilation', type: 'check', description: 'Ventilation primaire + secondaire' },
+      { id: 'racc_electrique', label: 'Raccordement électrique', type: 'check', description: 'Si microstation : alimentation + disjoncteur' },
     ]
   },
   {
-    id: 'ventilation',
+    id: 'remblai',
     phase: 6,
-    titre: 'Ventilation',
-    icon: '💨',
+    titre: 'Remblaiement',
+    icon: '⬆️',
     etapes: [
-      { id: 'vent_primaire', label: 'Pose ventilation primaire', type: 'check', description: 'Mise en place colonne de ventilation' },
-      { id: 'vent_haute', label: 'Pose ventilation haute (si prévue)', type: 'check', description: 'Ventilation aérienne ou extracteur' },
-      { id: 'vent_photo', label: 'Photo ventilation installée', type: 'photo', obligatoire: true, description: 'Vue d\'ensemble ventilation' },
+      { id: 'remb_lateral', label: 'Remblaiement latéral', type: 'check', description: 'Par couches de 30cm avec compactage' },
+      { id: 'remb_photo_mi', label: 'Photo mi-remblai', type: 'photo', obligatoire: false, description: 'Niveau intermédiaire visible' },
+      { id: 'remb_superieur', label: 'Remblaiement supérieur', type: 'check', description: 'Remise en état du terrain' },
+      { id: 'remb_photo_fin', label: 'Photo remblai terminé', type: 'photo', obligatoire: true, description: 'Remblai final, terrain restauré' },
     ]
   },
   {
-    id: 'mise_en_eau',
+    id: 'essais',
     phase: 7,
-    titre: 'Mise en eau & test',
+    titre: 'Essais & Mise en eau',
     icon: '💧',
     etapes: [
-      { id: 'eau_remplissage', label: 'Remplissage cuve', type: 'check', description: 'Remplir la cuve aux 3/4 minimum' },
-      { id: 'eau_test', label: 'Test étanchéité cuve', type: 'check', description: 'Vérifier absence de fuite après 30min' },
-      { id: 'eau_photo', label: 'Photo niveau eau + test', type: 'photo', obligatoire: true, description: 'Preuve du remplissage et résultat test' },
-      { id: 'eau_photo_ouvert', label: 'Photo installation ouverte', type: 'photo', obligatoire: true, description: 'Vue complète pour le SPANC (fouille ouverte)' },
+      { id: 'essai_etancheite', label: 'Test étanchéité', type: 'check', description: 'Remplissage, observation 24h' },
+      { id: 'essai_mise_eau', label: 'Mise en eau initiale', type: 'check', description: 'Remplissage cuve au niveau de fonctionnement' },
+      { id: 'essai_photo', label: 'Photo mise en eau', type: 'photo', obligatoire: true, description: 'Niveau d\'eau visible dans la cuve' },
     ]
   },
   {
-    id: 'remblaiement',
+    id: 'spanc',
     phase: 8,
-    titre: 'Remblaiement',
-    icon: '🚜',
+    titre: 'Contrôle SPANC',
+    icon: '📋',
     etapes: [
-      { id: 'remblai_couches', label: 'Remblai par couches', type: 'check', description: 'Remblai progressif latéral' },
-      { id: 'remblai_photo_cours', label: 'Photo remblai en cours', type: 'photo', obligatoire: true, description: 'Montrer le remblai par couches' },
-      { id: 'remblai_compactage', label: 'Compactage', type: 'check', description: 'Compactage couche par couche' },
-      { id: 'remblai_photo_fini', label: 'Photo remblai terminé', type: 'photo', obligatoire: true, description: 'Fouille entièrement remblayée' },
+      { id: 'spanc_avant_remblai', label: 'Visite SPANC avant remblai', type: 'check', description: 'Contrôle conformité par le SPANC (obligatoire)' },
+      { id: 'spanc_photo', label: 'Photo visite SPANC', type: 'photo', obligatoire: false, description: 'Inspecteur sur site, PV si disponible' },
+      { id: 'spanc_pv', label: 'PV SPANC reçu', type: 'check', description: 'Procès-verbal signé conforme/non-conforme' },
     ]
   },
   {
-    id: 'restauration',
+    id: 'finitions',
     phase: 9,
-    titre: 'Restauration surface',
-    icon: '🌱',
+    titre: 'Finitions',
+    icon: '✨',
     etapes: [
-      { id: 'resto_terre', label: 'Remise en place terre végétale', type: 'check', description: 'Surface nivelée' },
-      { id: 'resto_graine', label: 'Épandage graine (si prévu)', type: 'check', description: 'Semis gazon ou couvert végétal' },
-      { id: 'resto_photo', label: 'Photo état final terrain', type: 'photo', obligatoire: true, description: 'Vue du terrain restauré' },
+      { id: 'fin_nettoyage', label: 'Nettoyage chantier', type: 'check', description: 'Terrain propre, déchets évacués' },
+      { id: 'fin_photo_finale', label: 'Photo finale chantier', type: 'photo', obligatoire: true, description: 'Vue d\'ensemble chantier terminé' },
+      { id: 'fin_regards', label: 'Photo regards accessibles', type: 'photo', obligatoire: true, description: 'Tous les regards visibles et accessibles' },
     ]
   },
   {
     id: 'cloture',
     phase: 10,
     titre: 'Clôture chantier',
-    icon: '✅',
+    icon: '🏁',
     etapes: [
-      { id: 'fin_nettoyage', label: 'Nettoyage zone de travail', type: 'check', description: 'Chantier propre, déchets évacués' },
-      { id: 'fin_photo', label: 'Photo finale (vue générale)', type: 'photo', obligatoire: true, description: 'Vue d\'ensemble du chantier terminé' },
-      { id: 'fin_verification', label: 'Vérification complète', type: 'check', description: 'Toutes les étapes validées' },
-      { id: 'fin_signature', label: 'Signature fin de chantier', type: 'signature', description: 'Validation et horodatage départ' },
+      { id: 'clo_check_final', label: 'Vérification liste complète', type: 'check', description: 'Toutes les étapes obligatoires validées' },
+      { id: 'fin_signature', label: 'Signature fin de chantier', type: 'signature', description: 'Signature du client ou responsable' },
+      { id: 'clo_depart', label: 'Pointage départ', type: 'auto', description: 'Horodatage automatique fin de chantier' },
     ]
   },
 ]
 
-// ═══════════════════════════════════════════════════════════════
-// STORE — État des chantiers (suivi pose)
-// ═══════════════════════════════════════════════════════════════
+// ═══════════════════════════════════════════════════════════
+// STORE — Chantiers avec photos sur Supabase Storage
+// ═══════════════════════════════════════════════════════════
 
 export const useChantierStore = create(
   persist(
     (set, get) => ({
-      // { [devisId]: { etapes: {}, passages: [], spanc: [], photos: [], notes: '' } }
       chantiers: {},
 
       // ─── Initialiser un chantier ───
@@ -147,11 +143,12 @@ export const useChantierStore = create(
             ...s.chantiers,
             [devisId]: {
               devisId,
-              statut: 'en_cours', // en_cours, pause_spanc, termine
-              etapes: {},        // { [etapeId]: { fait: true, timestamp, poseur, photos: [] } }
-              passages: [],      // [{ poseur, arrivee, depart }]
-              spanc: [],         // [{ timestamp, inspecteur, conforme, commentaire, photoUrl }]
-              photos: [],        // toutes les photos avec metadata
+              statut: 'en_cours',
+              etapes: {},
+              passages: [],
+              spanc: [],
+              photos: [],       // Ne contient plus de base64, juste des URLs
+              signatures: [],
               notes: '',
               dateCreation: new Date().toISOString(),
             }
@@ -167,7 +164,7 @@ export const useChantierStore = create(
         return { chantiers: { ...s.chantiers, [devisId]: { ...ch, passages, statut: 'en_cours' } } }
       }),
 
-      // ─── Pointer départ (pause ou fin) ───
+      // ─── Pointer départ ───
       pointerDepart: (devisId, raison = 'pause') => set(s => {
         const ch = s.chantiers[devisId]
         if (!ch) return s
@@ -205,38 +202,69 @@ export const useChantierStore = create(
         return { chantiers: { ...s.chantiers, [devisId]: { ...ch, etapes } } }
       }),
 
-      // ─── Ajouter une photo à une étape (avec géolocalisation optionnelle) ───
-      ajouterPhoto: (devisId, etapeId, photoData, poseurNom, geo = null) => set(s => {
-        const ch = s.chantiers[devisId]
-        if (!ch) return s
-        const photo = {
-          id: Date.now().toString(),
-          etapeId,
-          dataUrl: photoData, // base64
-          timestamp: new Date().toISOString(),
-          poseur: poseurNom,
-          geo: geo || null, // { lat, lng, accuracy }
-        }
-        // Ajouter aux photos globales
-        const photos = [...ch.photos, photo]
-        // Ajouter la ref à l'étape
-        const etapeExistante = ch.etapes[etapeId] || {}
-        const etapes = {
-          ...ch.etapes,
-          [etapeId]: {
-            ...etapeExistante,
-            photos: [...(etapeExistante.photos || []), photo.id],
+      // ─── Ajouter une photo → Upload Supabase Storage ───
+      ajouterPhoto: (devisId, etapeId, photoData, poseurNom, geo = null) => {
+        const photoId = Date.now().toString()
+        
+        // 1. Ajouter immédiatement avec le base64 (pour affichage instantané)
+        set(s => {
+          const ch = s.chantiers[devisId]
+          if (!ch) return s
+          const photo = {
+            id: photoId,
+            etapeId,
+            dataUrl: photoData, // temporaire, sera remplacé par l'URL
+            photoUrl: null,     // sera rempli après upload
+            timestamp: new Date().toISOString(),
+            poseur: poseurNom,
+            geo: geo || null,
+            uploading: true,
           }
-        }
-        return { chantiers: { ...s.chantiers, [devisId]: { ...ch, photos, etapes } } }
-      }),
+          const photos = [...ch.photos, photo]
+          const etapeExistante = ch.etapes[etapeId] || {}
+          const etapes = {
+            ...ch.etapes,
+            [etapeId]: {
+              ...etapeExistante,
+              photos: [...(etapeExistante.photos || []), photoId],
+            }
+          }
+          return { chantiers: { ...s.chantiers, [devisId]: { ...ch, photos, etapes } } }
+        })
+
+        // 2. Upload en arrière-plan vers Supabase Storage
+        storage.uploadPhoto(devisId, etapeId, photoData).then(url => {
+          if (url) {
+            // Remplacer le base64 par l'URL Supabase
+            set(s => {
+              const ch = s.chantiers[devisId]
+              if (!ch) return s
+              const photos = ch.photos.map(p =>
+                p.id === photoId
+                  ? { ...p, photoUrl: url, dataUrl: null, uploading: false }
+                  : p
+              )
+              return { chantiers: { ...s.chantiers, [devisId]: { ...ch, photos } } }
+            })
+          } else {
+            // Upload échoué — garder le base64 en fallback
+            set(s => {
+              const ch = s.chantiers[devisId]
+              if (!ch) return s
+              const photos = ch.photos.map(p =>
+                p.id === photoId ? { ...p, uploading: false, uploadFailed: true } : p
+              )
+              return { chantiers: { ...s.chantiers, [devisId]: { ...ch, photos } } }
+            })
+          }
+        })
+      },
 
       // ─── Supprimer une photo ───
       supprimerPhoto: (devisId, photoId) => set(s => {
         const ch = s.chantiers[devisId]
         if (!ch) return s
         const photos = ch.photos.filter(p => p.id !== photoId)
-        // Nettoyer les refs dans les étapes
         const etapes = { ...ch.etapes }
         Object.keys(etapes).forEach(k => {
           if (etapes[k].photos) {
@@ -254,7 +282,7 @@ export const useChantierStore = create(
           id: Date.now().toString(),
           timestamp: new Date().toISOString(),
           inspecteur: data.inspecteur || '',
-          conforme: data.conforme, // true / false / null (en attente)
+          conforme: data.conforme,
           commentaire: data.commentaire || '',
           photoUrl: data.photoUrl || null,
         }
@@ -294,6 +322,13 @@ export const useChantierStore = create(
         const ch = get().chantiers[devisId]
         if (!ch) return []
         return ch.photos.filter(p => p.etapeId === etapeId)
+      },
+
+      // Helper: obtenir l'URL d'affichage d'une photo
+      getPhotoSrc: (photo) => {
+        if (photo.photoUrl) return photo.photoUrl     // URL Supabase
+        if (photo.dataUrl) return photo.dataUrl       // Base64 fallback
+        return ''
       },
 
       // ─── Reset chantier ───
