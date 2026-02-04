@@ -235,6 +235,7 @@ function ProduitsTab({search}) {
                   {cat&&<span className="px-1.5 py-0.5 bg-rose/10 text-rose border border-rose/20 rounded text-[9px] font-bold">{cat.nom}</span>}
                   {tc==='cuve'&&matLabel&&<span className="px-1.5 py-0.5 bg-white/5 text-gray-400 rounded text-[9px] font-bold">{matLabel}</span>}
                   {p.carrossable&&<span className="px-1.5 py-0.5 bg-amber-500/10 text-amber-400 border border-amber-500/20 rounded text-[9px] font-bold">🚗 {p.tonnageCarrossable||'3.5'}t</span>}
+                  {p.dalleMortierObligatoire&&<span className="px-1.5 py-0.5 bg-green-500/10 text-green-400 border border-green-500/20 rounded text-[9px] font-bold">🏗️ Dalle</span>}
                   {tc==='cuve'&&nbCuves>1&&<span className="px-1.5 py-0.5 bg-blue-500/10 text-blue-400 border border-blue-500/20 rounded text-[9px] font-bold">{nbCuves} cuves</span>}
                 </div>
                 <p className="text-[10px] text-gray-500 mt-0.5">
@@ -285,6 +286,11 @@ function ProduitsTab({search}) {
           <label className="flex items-center space-x-2 cursor-pointer py-0.5">
             <input type="checkbox" checked={form.relevageIntegre||false} onChange={e=>set('relevageIntegre',e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-600 text-rose bg-bg-input"/>
             <span className="text-xs text-gray-300">Relevage intégré</span>
+          </label>
+
+          <label className="flex items-center space-x-2 cursor-pointer py-0.5">
+            <input type="checkbox" checked={form.dalleMortierObligatoire||false} onChange={e=>set('dalleMortierObligatoire',e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-600 text-rose bg-bg-input"/>
+            <span className="text-xs text-gray-300">Dalle mortier obligatoire</span>
           </label>
 
           {/* CUVES 1 à 4 */}

@@ -50,7 +50,7 @@ export default function NewDevis() {
     typeInstallation:'microstation',modeInstallation:'souterrain',absenceEtudeSol:false,
     deconstruction:false,decoLongueur:'',decoLargeur:'',decoHauteur:'',
     produitId:'',produitsAssocies:[],produitsSup:[],
-    gpsAncLat:null,gpsAncLng:null,gpsRemblaisLat:null,gpsRemblaisLng:null,gpsFournisseurLat:null,gpsFournisseurLng:null,gpsMortierLat:null,gpsMortierLng:null,activeMapMarker:null,
+    gpsAncLat:null,gpsAncLng:null,gpsRemblaisLat:null,gpsRemblaisLng:null,gpsFournisseurLat:null,gpsFournisseurLng:null,gpsMortierLat:null,gpsMortierLng:null,gpsDechetterieLat:null,gpsDechetterieLng:null,activeMapMarker:null,
     profondeur:'0.5',vehiculeId:'',vehiculeMortierId:'',enginId:'pelle_8t',typeSolId:'terre',
     distanceDepotChantierKm:'30',
     nbPoseurs:'2',epaisseurMortier:'0.20',
@@ -82,7 +82,7 @@ export default function NewDevis() {
       typeInstallation:d.typeInstallation||'microstation',modeInstallation:d.modeInstallation||'souterrain',absenceEtudeSol:d.absenceEtudeSol||false,
       deconstruction:d.deconstruction||false,decoLongueur:d.decoLongueur?String(d.decoLongueur):'',decoLargeur:d.decoLargeur?String(d.decoLargeur):'',decoHauteur:d.decoHauteur?String(d.decoHauteur):'',
       produitId:d.produitId||'',produitsAssocies:d.produitsAssocies||[],produitsSup:d.produitsSup||[],
-      gpsAncLat:d.gpsAnc?.lat||null,gpsAncLng:d.gpsAnc?.lng||null,gpsRemblaisLat:d.gpsRemblais?.lat||null,gpsRemblaisLng:d.gpsRemblais?.lng||null,gpsFournisseurLat:d.gpsFournisseur?.lat||null,gpsFournisseurLng:d.gpsFournisseur?.lng||null,gpsMortierLat:d.gpsMortier?.lat||null,gpsMortierLng:d.gpsMortier?.lng||null,activeMapMarker:null,
+      gpsAncLat:d.gpsAnc?.lat||null,gpsAncLng:d.gpsAnc?.lng||null,gpsRemblaisLat:d.gpsRemblais?.lat||null,gpsRemblaisLng:d.gpsRemblais?.lng||null,gpsFournisseurLat:d.gpsFournisseur?.lat||null,gpsFournisseurLng:d.gpsFournisseur?.lng||null,gpsMortierLat:d.gpsMortier?.lat||null,gpsMortierLng:d.gpsMortier?.lng||null,gpsDechetterieLat:d.gpsDechetterie?.lat||null,gpsDechetterieLng:d.gpsDechetterie?.lng||null,activeMapMarker:null,
       profondeur:d.profondeur?String(d.profondeur):'0.5',vehiculeId:d.vehiculeId||'',vehiculeMortierId:d.vehiculeMortierId||'',enginId:d.enginId||'pelle_8t',typeSolId:d.typeSolId||'terre',
       distanceDepotChantierKm:d.distanceDepotChantierKm?String(d.distanceDepotChantierKm):'30',
       nbPoseurs:d.nbPoseurs?String(d.nbPoseurs):'2',epaisseurMortier:d.epaisseurMortier?String(d.epaisseurMortier):'0.20',
@@ -148,9 +148,23 @@ export default function NewDevis() {
   const distanceKm = (form.gpsAncLat && form.gpsRemblaisLat) ? roadDistance(form.gpsAncLat,form.gpsAncLng,form.gpsRemblaisLat,form.gpsRemblaisLng) : 0
   const distanceLivraisonKm = (form.gpsAncLat && form.gpsFournisseurLat) ? roadDistance(form.gpsFournisseurLat,form.gpsFournisseurLng,form.gpsAncLat,form.gpsAncLng) : 0
   const distanceMortierKm = (form.gpsAncLat && form.gpsMortierLat) ? roadDistance(form.gpsMortierLat,form.gpsMortierLng,form.gpsAncLat,form.gpsAncLng) : 0
+  const distanceDechetterieKm = (form.gpsAncLat && form.gpsDechetterieLat) ? roadDistance(form.gpsAncLat,form.gpsAncLng,form.gpsDechetterieLat,form.gpsDechetterieLng) : 0
   const selVehiculeMortier = vehicules.find(v=>v.id===form.vehiculeMortierId)
   const produitsFiltered = useMemo(()=>{
     if(form.typeInstallation==='autre') return produits
+    // Mapper le type d'installation vers les catégories de cuves correspondantes
+    const INSTALL_TO_CAT = {
+      microstation: ['microstations'],
+      filtre_compact: ['filtres_compacts'],
+      filtre_epandage: ['filtres_compacts', 'fosses'],
+      fosse_epandage: ['fosses'],
+    }
+    const allowedCats = INSTALL_TO_CAT[form.typeInstallation] || []
+    if (allowedCats.length > 0) {
+      const filtered = produits.filter(p => allowedCats.includes(p.categorieId))
+      if (filtered.length > 0) return filtered
+    }
+    // Fallback: toutes les cuves
     const cp = produits.filter(p=>{const cat=categories.find(c=>c.id===p.categorieId);return cat&&cat.typeCategorie==='cuve'})
     return cp.length>0?cp:produits
   },[produits,categories,form.typeInstallation])
@@ -242,6 +256,7 @@ export default function NewDevis() {
     if(id==='remblais'){set('gpsRemblaisLat',lat);set('gpsRemblaisLng',lng)}
     if(id==='fournisseur'){set('gpsFournisseurLat',lat);set('gpsFournisseurLng',lng)}
     if(id==='mortier'){set('gpsMortierLat',lat);set('gpsMortierLng',lng)}
+    if(id==='dechetterie'){set('gpsDechetterieLat',lat);set('gpsDechetterieLng',lng)}
   },[])
 
   const mapMarkers = [
@@ -249,6 +264,7 @@ export default function NewDevis() {
     ...(form.gpsRemblaisLat?[{id:'remblais',label:'🚛 Dépôt remblais',lat:form.gpsRemblaisLat,lng:form.gpsRemblaisLng,color:'orange'}]:[]),
     ...(form.gpsFournisseurLat?[{id:'fournisseur',label:'🏭 Fournisseur',lat:form.gpsFournisseurLat,lng:form.gpsFournisseurLng,color:'blue'}]:[]),
     ...(form.gpsMortierLat?[{id:'mortier',label:'🏗️ Centrale béton',lat:form.gpsMortierLat,lng:form.gpsMortierLng,color:'green'}]:[]),
+    ...(form.gpsDechetterieLat?[{id:'dechetterie',label:'♻️ Déchetterie',lat:form.gpsDechetterieLat,lng:form.gpsDechetterieLng,color:'purple'}]:[]),
   ]
 
   const updateSection = (idx, texte) => {
@@ -266,7 +282,8 @@ export default function NewDevis() {
     gpsRemblais:form.gpsRemblaisLat?{lat:form.gpsRemblaisLat,lng:form.gpsRemblaisLng}:null,
     gpsFournisseur:form.gpsFournisseurLat?{lat:form.gpsFournisseurLat,lng:form.gpsFournisseurLng}:null,
     gpsMortier:form.gpsMortierLat?{lat:form.gpsMortierLat,lng:form.gpsMortierLng}:null,
-    distanceTransportKm:distanceKm,distanceLivraisonKm,distanceMortierKm,distanceDepotChantierKm:parseFloat(form.distanceDepotChantierKm)||0,profondeur:parseFloat(form.profondeur)||0.5,
+    gpsDechetterie:form.gpsDechetterieLat?{lat:form.gpsDechetterieLat,lng:form.gpsDechetterieLng}:null,
+    distanceTransportKm:distanceKm,distanceLivraisonKm,distanceMortierKm,distanceDechetterieKm,distanceDepotChantierKm:parseFloat(form.distanceDepotChantierKm)||0,profondeur:parseFloat(form.profondeur)||0.5,
     volumeFouille:volFouille,volumeCuves:volCuves,volumeRemblais:volRemblais,surfaceFouille,nbCuves,
     mlPVCEnterres,volumeSablePVC:volSablePVC,
     vehiculeId:form.vehiculeId,vehiculeNom:selVehicule?.nom||'',
@@ -295,9 +312,8 @@ export default function NewDevis() {
     e.preventDefault()
     if(!form.typeInstallation){alert('Veuillez sélectionner un type ANC');setStep(2);return}
     const data=buildDevisData()
-    if(isEdit){updateDevis(editId,data);navigate(`/devis/${editId}`)}
-    else{const saved=await addDevis(data);navigate(`/devis/${saved?.id||'/'}`)}
-  }
+    if(isEdit){updateDevis(editId,data);navigate(`/devis/${editId}`,{replace:true})}
+    else{const saved=await addDevis(data);navigate(`/devis/${saved?.id||'/'}`,{replace:true})}  }
 
   const steps=[{n:1,l:'Client'},{n:2,l:'Install.'},{n:3,l:'Produit'},{n:4,l:'GPS'},{n:5,l:'Technique'},{n:6,l:'Rédaction'},{n:7,l:'Devis'}]
   const scColors={terre:'border-emerald-500/30 bg-emerald-500/5',mixte:'border-amber-500/30 bg-amber-500/5',roche:'border-red-500/30 bg-red-500/5'}
@@ -322,10 +338,29 @@ export default function NewDevis() {
             volSablePVC>0&&`Sable PVC : ${volSablePVC.toFixed(2)} m³`,
             epandageData&&`Gravier épandage : ${epandageData.volumeGravier} m³`,
             epandageData&&`Drains : ${epandageData.longueurDrainTotal} ml`,
-            form.posteRelevage&&'Poste relevage : OUI',
+            form.posteRelevage&&`Câble élec : ${form.longueurCableElec||'?'} ml (${form.sectionCable}mm²)`,
+            form.posteRelevage&&'Fourreau électrique',
             'Dossier photo : 100€',
             ...form.produitsAssocies.map(p=>{const k=kitAssocies.find(x=>x.nom===p);return`✓ ${p} — ${fmtC(k?.prix||150)}`}),
             ...form.produitsSup.map(p=>`➕ ${p.nom} — ${p.prixHT}€`),
+          ].filter(Boolean).map((l,i)=><li key={i}>• {l}</li>)}</ul>
+        </Sec>
+        <Sec t="🧰 Outillage à emmener">
+          <ul className="space-y-0.5 text-white">{[
+            '🔑 Clé à pipe / clé plate',
+            '🪛 Visseuse + forets béton',
+            '⛏️ Pelle manuelle + pioche',
+            '🪓 Barre à mine / bêche',
+            'Niveau à bulle (1m)',
+            'Mètre + cordeau',
+            'Scie à PVC + colle PVC',
+            'Massette + burin',
+            selEngin&&`⛽ Gasoil engin (~${Math.ceil((selEngin.consommationLH||8)*8)}L/jour)`,
+            form.posteRelevage&&'🔌 Rallonge électrique',
+            form.deconstruction&&'Masse + disqueuse',
+            form.restaurationSurface&&'Râteau + rouleau gazon',
+            'Gants + EPI',
+            '📸 Smartphone (photos chantier)',
           ].filter(Boolean).map((l,i)=><li key={i}>• {l}</li>)}</ul>
         </Sec>
         <Sec t="Volumes"><G2 items={[['Fouille',volFouille.toFixed(1)+' m³'],['Remblais',volRemblais.toFixed(1)+' m³'],['Foisonné',(volFouille*1.3).toFixed(1)+' m³']]}/></Sec>
@@ -420,13 +455,15 @@ export default function NewDevis() {
               <button type="button" onClick={()=>set('activeMapMarker',form.activeMapMarker==='remblais'?null:'remblais')} className={`h-8 px-3 text-xs font-semibold rounded flex items-center space-x-1.5 transition-all ${form.activeMapMarker==='remblais'?'bg-orange-500/20 text-orange-400 border border-orange-500/40 ring-2 ring-orange-500/20':'bg-bg-input border border-white/10 text-gray-400 hover:border-rose/30'}`}><Navigation className="w-3 h-3"/><span>🚛 Dépôt{form.gpsRemblaisLat?' ✓':''}</span></button>
               <button type="button" onClick={()=>set('activeMapMarker',form.activeMapMarker==='fournisseur'?null:'fournisseur')} className={`h-8 px-3 text-xs font-semibold rounded flex items-center space-x-1.5 transition-all ${form.activeMapMarker==='fournisseur'?'bg-blue-500/20 text-blue-400 border border-blue-500/40 ring-2 ring-blue-500/20':'bg-bg-input border border-white/10 text-gray-400 hover:border-rose/30'}`}><MapPin className="w-3 h-3"/><span>🏭 Fournisseur{form.gpsFournisseurLat?' ✓':''}</span></button>
               <button type="button" onClick={()=>set('activeMapMarker',form.activeMapMarker==='mortier'?null:'mortier')} className={`h-8 px-3 text-xs font-semibold rounded flex items-center space-x-1.5 transition-all ${form.activeMapMarker==='mortier'?'bg-green-500/20 text-green-400 border border-green-500/40 ring-2 ring-green-500/20':'bg-bg-input border border-white/10 text-gray-400 hover:border-rose/30'}`}><MapPin className="w-3 h-3"/><span>🏗️ Centrale béton{form.gpsMortierLat?' ✓':''}</span></button>
+              {form.deconstruction&&<button type="button" onClick={()=>set('activeMapMarker',form.activeMapMarker==='dechetterie'?null:'dechetterie')} className={`h-8 px-3 text-xs font-semibold rounded flex items-center space-x-1.5 transition-all ${form.activeMapMarker==='dechetterie'?'bg-purple-500/20 text-purple-400 border border-purple-500/40 ring-2 ring-purple-500/20':'bg-bg-input border border-white/10 text-gray-400 hover:border-rose/30'}`}><MapPin className="w-3 h-3"/><span>♻️ Déchetterie{form.gpsDechetterieLat?' ✓':''}</span></button>}
             </div>
-            {form.activeMapMarker&&<div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-400">➤ Mode <strong>{form.activeMapMarker==='anc'?'ANC':form.activeMapMarker==='remblais'?'Dépôt':form.activeMapMarker==='fournisseur'?'Fournisseur':'Centrale béton'}</strong> — cliquez sur la carte.</div>}
+            {form.activeMapMarker&&<div className="px-3 py-1.5 bg-amber-500/10 border border-amber-500/20 rounded text-[10px] text-amber-400">➤ Mode <strong>{form.activeMapMarker==='anc'?'ANC':form.activeMapMarker==='remblais'?'Dépôt':form.activeMapMarker==='fournisseur'?'Fournisseur':form.activeMapMarker==='dechetterie'?'Déchetterie':'Centrale béton'}</strong> — cliquez sur la carte.</div>}
             <MapPicker markers={mapMarkers} activeMarker={form.activeMapMarker} onMarkerPlace={handleMapPlace} height="340px"/>
             <div className="space-y-1">
               {distanceKm>0&&<Info>🚛 Évacuation (ANC → Dépôt) : <strong className="text-white">{distanceKm.toFixed(1)} km</strong> — A/R : {(distanceKm*2).toFixed(1)} km</Info>}
               {distanceLivraisonKm>0&&<Info>🏭 Livraison (Fournisseur → ANC) : <strong className="text-blue-400">{distanceLivraisonKm.toFixed(1)} km</strong> — A/R : {(distanceLivraisonKm*2).toFixed(1)} km</Info>}
               {distanceMortierKm>0&&<Info>🏗️ Mortier (Centrale → ANC) : <strong className="text-green-400">{distanceMortierKm.toFixed(1)} km</strong> — A/R : {(distanceMortierKm*2).toFixed(1)} km</Info>}
+              {distanceDechetterieKm>0&&<Info>♻️ Déchetterie (ANC → Déchetterie) : <strong className="text-purple-400">{distanceDechetterieKm.toFixed(1)} km</strong> — A/R : {(distanceDechetterieKm*2).toFixed(1)} km</Info>}
             </div>
             <div className="flex justify-between pt-2"><button type="button" onClick={()=>setStep(3)} className="h-8 px-3 text-xs text-gray-500 hover:text-white hover:bg-white/5 rounded">← Retour</button><button type="button" onClick={()=>setStep(5)} className="h-8 px-4 bg-rose text-white text-xs font-semibold rounded">Suivant →</button></div>
           </div></Window>}
@@ -459,6 +496,7 @@ export default function NewDevis() {
               <div><label className={lbl}>📍 Distance dépôt → chantier (km)</label><input type="number" value={form.distanceDepotChantierKm} onChange={e=>set('distanceDepotChantierKm',e.target.value)} min="0" step="1" className={inp} placeholder="30"/></div>
             </div>
             {/* DALLE MORTIER AUTO */}
+            {sel?.dalleMortierObligatoire&&<div className="px-3 py-1.5 bg-green-500/10 border border-green-500/20 rounded text-[10px] text-green-400 font-bold">🏗️ Ce produit exige une dalle de mortier — section ci-dessous pré-activée.</div>}
             {surfaceFouille>0&&<div className="bg-green-500/5 border border-green-500/15 rounded p-3">
               <label className={lbl}>🏗️ Dalle mortier (fond de fouille)</label>
               <div className="grid grid-cols-3 gap-2">
@@ -485,7 +523,9 @@ export default function NewDevis() {
             <div className="border-t border-white/5 pt-3"><label className={lbl}>🌊 Type de rejet</label><div className="grid grid-cols-2 gap-1">{TYPES_REJET.map(r=>(<label key={r.id} className={`flex items-center space-x-2 px-3 py-2 rounded border cursor-pointer transition-all ${form.typeRejet===r.id?'bg-rose/10 border-rose/40 text-white':'bg-bg-input border-white/5 text-gray-400 hover:border-white/15'}`}><input type="radio" name="rejet" value={r.id} checked={form.typeRejet===r.id} onChange={e=>set('typeRejet',e.target.value)} className="w-3 h-3 text-rose bg-bg-input border-gray-600"/><span className="text-[10px] font-medium">{r.nom}</span></label>))}</div></div>
 
             <div className="border-t border-white/5 pt-3"><label className="flex items-center space-x-2 cursor-pointer mb-2"><input type="checkbox" checked={form.posteRelevage} onChange={e=>set('posteRelevage',e.target.checked)} className="w-3.5 h-3.5 rounded border-gray-600 text-rose bg-bg-input"/><span className="text-xs font-medium text-gray-300">⚡ Poste de relevage</span></label>
-              {form.posteRelevage&&<div className="ml-6 space-y-2"><Info>Le client devra faire installer un fusible dédié + fourreau au tableau électrique.</Info><div className="grid grid-cols-3 gap-2"><div><label className="text-[9px] text-gray-600">Câble élec (ml)</label><input type="number" value={form.longueurCableElec} onChange={e=>set('longueurCableElec',e.target.value)} min="0" className={inp} placeholder="0"/></div><div><label className="text-[9px] text-gray-600">Section câble</label><select value={form.sectionCable} onChange={e=>set('sectionCable',e.target.value)} className={inp}><option value="2.5">2,5 mm² ({tarifsMateriaux?.cableElec25Ml||6}€/ml)</option><option value="4">4 mm² ({tarifsMateriaux?.cableElec4Ml||8}€/ml)</option><option value="6">6 mm² ({tarifsMateriaux?.cableElec6Ml||12}€/ml)</option></select></div><div><label className="text-[9px] text-gray-600">Fourreau</label><p className="h-9 flex items-center text-sm text-gray-400">{fmtC(tarifsMateriaux?.fourreauElec||25)}</p></div></div>{coutElec>0&&<p className="text-[9px] text-gray-500">Total élec : {fmtC(coutElec)} <span className="text-gray-600">(câble {prixCableMl}€/ml × {form.longueurCableElec}ml + fourreau {fmtC(tarifsMateriaux?.fourreauElec||25)})</span></p>}</div>}
+              {form.posteRelevage&&<div className="ml-6 space-y-2"><Info>Le client devra faire installer un fusible dédié + fourreau au tableau électrique.</Info>
+                {!form.longueurCableElec&&<div className="px-3 py-1.5 bg-red-500/10 border border-red-500/20 rounded text-[10px] text-red-400 font-bold">⚠️ Longueur de câble électrique obligatoire !</div>}
+                <div className="grid grid-cols-3 gap-2"><div><label className="text-[9px] text-gray-600">Câble élec (ml) *</label><input type="number" value={form.longueurCableElec} onChange={e=>set('longueurCableElec',e.target.value)} min="0" className={`${inp} ${!form.longueurCableElec?'border-red-500/40 ring-1 ring-red-500/20':''}`} placeholder="obligatoire"/></div><div><label className="text-[9px] text-gray-600">Section câble</label><select value={form.sectionCable} onChange={e=>set('sectionCable',e.target.value)} className={inp}><option value="2.5">2,5 mm² ({tarifsMateriaux?.cableElec25Ml||6}€/ml)</option><option value="4">4 mm² ({tarifsMateriaux?.cableElec4Ml||8}€/ml)</option><option value="6">6 mm² ({tarifsMateriaux?.cableElec6Ml||12}€/ml)</option></select></div><div><label className="text-[9px] text-gray-600">Fourreau</label><p className="h-9 flex items-center text-sm text-gray-400">{fmtC(tarifsMateriaux?.fourreauElec||25)}</p></div></div>{coutElec>0&&<p className="text-[9px] text-gray-500">Total élec : {fmtC(coutElec)} <span className="text-gray-600">(câble {prixCableMl}€/ml × {form.longueurCableElec}ml + fourreau {fmtC(tarifsMateriaux?.fourreauElec||25)})</span></p>}</div>}
             </div>
 
             {/* ÉPANDAGE */}
