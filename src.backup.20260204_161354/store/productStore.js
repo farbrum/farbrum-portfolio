@@ -2,7 +2,6 @@ import { create } from 'zustand'
 import { db, settings } from '../services/supabase'
 
 
-
 export const GROUPES_CATEGORIES = [
   { id: 'assainissement', nom: 'Assainissement', ordre: 1 },
   { id: 'materiaux', nom: 'Matériaux & Fournitures', ordre: 2 },
@@ -501,11 +500,6 @@ export function calcScenario(engin, typeSol, volumeFouille, volumeDeco, distance
     coutMortierTranspClient, coutLivraisonClient,
   }
 }
-
-
-// ═══════════════════════════════════════════════════════════
-// STORE — Zustand SANS localStorage, avec sync Supabase
-// ═══════════════════════════════════════════════════════════
 
 
 // ═══════════════════════════════════════════════════════════
