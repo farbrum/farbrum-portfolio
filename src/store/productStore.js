@@ -37,7 +37,7 @@ export const ENGINS = [
 
 // ===== RESSOURCES HUMAINES =====
 export const RESSOURCES_HUMAINES_DEFAULT = [
-  { id: 'pelleur_1', nom: 'Pelleur / Conducteur engin', pin: '1234', roles: ['pelleur'], role: 'pelleur', tarifJournalier: 280, tarifHoraire: 35, competences: ['excavation','pose','remblai'], joursTravail: [1,2,3,4,5,6], vacances: [], indisponibilites: [] },
+  { id: 'pelleur_1', nom: 'Conducteur d'engin', pin: '1234', roles: ['pelleur'], role: 'pelleur', tarifJournalier: 280, tarifHoraire: 35, competences: ['excavation','pose','remblai'], joursTravail: [1,2,3,4,5,6], vacances: [], indisponibilites: [] },
   { id: 'chauffeur_1', nom: 'Chauffeur PL / Tracteur', pin: '5678', roles: ['chauffeur'], role: 'chauffeur', tarifJournalier: 250, tarifHoraire: 31.25, competences: ['transport','livraison'], joursTravail: [1,2,3,4,5], vacances: [], indisponibilites: [] },
   { id: 'poseur_1', nom: 'Poseur / Tuyauteur', pin: '9012', roles: ['poseur'], role: 'poseur', tarifJournalier: 260, tarifHoraire: 32.5, competences: ['pose','tuyauterie','collage'], joursTravail: [1,2,3,4,5], vacances: [], indisponibilites: [] },
 ]

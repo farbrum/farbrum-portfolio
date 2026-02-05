@@ -172,7 +172,7 @@ function ProduitsTab({search}) {
     cuves:[{...EMPTY_CUVE}],
     profondeurMin:'0.5', relevageIntegre:false, recommandationFournisseur:'',
     diametre:'',angle:'',unite:'',
-    poidsM3:'',prixM3HT:'',
+    poidsM3:'',prixTonneHT:'',prixTransportVoyage:'',
     pdfUrl:'',pdfLocal:'',pdfLocalName:'',
     description:'',
   }
@@ -212,7 +212,7 @@ function ProduitsTab({search}) {
 
   const save=()=>{
     if(!form.nom.trim())return
-    const d={...form,prixHT:parseFloat(form.prixHT)||0,profondeurMin:parseFloat(form.profondeurMin)||0,poidsM3:parseFloat(form.poidsM3)||0,prixM3HT:parseFloat(form.prixM3HT)||0,volumeFouille,poidsTotal}
+    const d={...form,prixHT:parseFloat(form.prixHT)||0,profondeurMin:parseFloat(form.profondeurMin)||0,poidsM3:parseFloat(form.poidsM3)||0,prixTonneHT:parseFloat(form.prixTonneHT)||0,prixTransportVoyage:parseFloat(form.prixTransportVoyage)||0,volumeFouille,poidsTotal}
     modal==='add'?addProduit(d):updateProduit(modal.id,d);setModal(null)
   }
 
@@ -248,7 +248,7 @@ function ProduitsTab({search}) {
                 </p>
               </div>
               <div className="flex items-center space-x-1 ml-2">
-                <span className="text-sm font-bold text-rose mr-1">{p.prixHT>0?`${p.prixHT}€`:p.prixM3HT>0?`${p.prixM3HT}€/m³`:'—'}</span>
+                <span className="text-sm font-bold text-rose mr-1">{p.prixHT>0?`${p.prixHT}€`:p.prixTonneHT>0?`${p.prixTonneHT}€/t`:p.prixM3HT>0?`${p.prixM3HT}€/m³`:'—'}</span>
                 {(p.pdfLocal||p.pdfUrl)&&<button onClick={()=>window.open(p.pdfUrl||p.pdfLocal)} className="p-1.5 text-gray-600 hover:text-rose"><FileText className="w-3 h-3"/></button>}
                 <Btn variant="ghost" onClick={()=>openEdit(p)}><Pencil className="w-3 h-3"/></Btn>
                 <Btn variant="danger" onClick={()=>{if(confirm('Supprimer ?'))deleteProduit(p.id)}}><Trash2 className="w-3 h-3"/></Btn>
@@ -355,9 +355,10 @@ function ProduitsTab({search}) {
         </>)}
 
         {/* ===== REMBLAI ===== */}
-        {isRemblai&&(<div className="grid grid-cols-2 gap-2">
+        {isRemblai&&(<div className="grid grid-cols-3 gap-2">
           <Field label="Poids/m³" type="number" value={form.poidsM3} onChange={v=>set('poidsM3',v)} suffix="t/m³" step="0.1"/>
-          <Field label="Prix/m³ HT" type="number" value={form.prixM3HT} onChange={v=>set('prixM3HT',v)} suffix="€/m³"/>
+          <Field label="Prix/tonne HT" type="number" value={form.prixTonneHT} onChange={v=>set('prixTonneHT',v)} suffix="€/t"/>
+          <Field label="Prix transport/voyage" type="number" value={form.prixTransportVoyage} onChange={v=>set('prixTransportVoyage',v)} suffix="€/voy."/>
         </div>)}
 
         {/* ===== ACCESSOIRE/AUTRE ===== */}

@@ -1,5 +1,5 @@
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useCallback, useRef } from 'react'
 import { useAuthStore } from './store/authStore'
 import { useProductStore } from './store/productStore'
 import { useDevisStore } from './store/devisStore'
@@ -12,6 +12,37 @@ import Administration from './pages/Administration'
 import Ressources from './pages/Ressources'
 import FichePoseur from './pages/FichePoseur'
 import Layout from './components/Layout'
+
+const INACTIVITY_TIMEOUT = 4 * 60 * 1000 // 4 minutes
+
+function InactivityGuard({ children }) {
+  const logout = useAuthStore(s => s.logout)
+  const user = useAuthStore(s => s.user)
+  const timerRef = useRef(null)
+
+  const resetTimer = useCallback(() => {
+    if (timerRef.current) clearTimeout(timerRef.current)
+    timerRef.current = setTimeout(() => {
+      if (useAuthStore.getState().user) {
+        useAuthStore.getState().logout()
+        window.location.href = '/login'
+      }
+    }, INACTIVITY_TIMEOUT)
+  }, [])
+
+  useEffect(() => {
+    if (!user) return
+    const events = ['mousedown', 'mousemove', 'keydown', 'scroll', 'touchstart', 'click']
+    events.forEach(e => window.addEventListener(e, resetTimer, { passive: true }))
+    resetTimer()
+    return () => {
+      events.forEach(e => window.removeEventListener(e, resetTimer))
+      if (timerRef.current) clearTimeout(timerRef.current)
+    }
+  }, [user, resetTimer])
+
+  return children
+}
 
 function AppLoader({ children }) {
   const [ready, setReady] = useState(false)
@@ -42,6 +73,7 @@ export default function App() {
   return (
     <BrowserRouter>
       <AppLoader>
+        <InactivityGuard>
         <Routes>
           {/* Route poseur — accessible SANS login via QR code */}
           <Route path="/chantier/:devisId" element={<FichePoseur />} />
@@ -61,6 +93,7 @@ export default function App() {
             <Route path="*" element={<Navigate to="/login" />} />
           )}
         </Routes>
+        </InactivityGuard>
       </AppLoader>
     </BrowserRouter>
   )

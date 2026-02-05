@@ -246,20 +246,44 @@ export default function NewDevis() {
         const kit=kitAssocies.find(k=>k.nom===nom)
         return s + (kit?.prix || 150)
       },0)
-      const extras = coutCoudes + coutRehausses + coutElec + coutTerreVegetale + coutEpandage + coutBlocs + COUT_DOSSIER_PHOTO
+      // Calcul transport remblais (fournitures de type remblai avec transport)
+      let coutTransportRemblais = 0
+      let nbVoyagesRemblais = 0
+      let detailRemblais = []
+      const volRemblais = calc.mainOeuvre?.volRemblais || (volFouille - (sel ? (sel.volumeCuves||calcVolumeCuvesStrict(sel)) : 0))
+      form.produitsAssocies.forEach(nom=>{
+        const kit=kitAssocies.find(k=>k.nom===nom)
+        if(!kit)return
+        // Chercher le produit remblais dans le catalogue pour prix transport
+        const pRemblai = produits.find(p=>p.nom===nom && p.poidsM3>0)
+        if(pRemblai && pRemblai.prixTransportVoyage>0 && selVehicule){
+          const chargeUtileTonnes = (selVehicule.ptac||17) - (selVehicule.poidsVide||8)
+          const tonnageTotal = volRemblais * (pRemblai.poidsM3||1.5)
+          const voyages = Math.ceil(tonnageTotal / chargeUtileTonnes)
+          const coutTransp = voyages * pRemblai.prixTransportVoyage
+          coutTransportRemblais += coutTransp
+          nbVoyagesRemblais += voyages
+          detailRemblais.push({nom,tonnageTotal:Math.round(tonnageTotal*10)/10,voyages,coutTransp})
+        }
+      })
+      const extras = coutCoudes + coutRehausses + coutElec + coutTerreVegetale + coutEpandage + coutBlocs + COUT_DOSSIER_PHOTO + coutTransportRemblais
       // Total = tous les coûts CLIENT (opérateurs déjà inclus dans les postes)
       const sousTotal = calc.coutTerrassementClient + calc.coutTransportClient + calc.coutMortierTranspClient + calc.coutMortierMatiere + calc.coutLivraisonClient + calc.coutPoseur + coutMateriel + coutProduitsSup + coutAssocies + extras
+      // Marge entreprise
+      const margeEntreprise = parseFloat(tarifsChantier?.margeEntreprisePct || 0)
+      const montantMarge = margeEntreprise > 0 ? Math.ceil(sousTotal * margeEntreprise / 100) : 0
+      const sousTotalAvecMarge = sousTotal + montantMarge
       // Remise
       let montantRemise = 0
       if(form.remiseType==='pourcent' && parseFloat(form.remisePourcent)>0){
-        montantRemise = sousTotal * (parseFloat(form.remisePourcent)/100)
+        montantRemise = sousTotalAvecMarge * (parseFloat(form.remisePourcent)/100)
       } else if(form.remiseType==='montant' && parseFloat(form.remiseMontant)>0){
         montantRemise = parseFloat(form.remiseMontant)
       }
-      const totalHT = Math.max(0, sousTotal - montantRemise)
-      return{...calc,coutMateriel,coutProduitsSup,coutAssocies,coutCoudes,coutRehausses,coutElec,coutTerreVegetale,coutEpandage,coutDossierPhoto:COUT_DOSSIER_PHOTO,montantRemise,totalHT,totalTVA:totalHT*0.2,totalTTC:totalHT*1.2}
+      const totalHT = Math.max(0, sousTotalAvecMarge - montantRemise)
+      return{...calc,coutMateriel,coutProduitsSup,coutAssocies,coutCoudes,coutRehausses,coutElec,coutTerreVegetale,coutEpandage,coutDossierPhoto:COUT_DOSSIER_PHOTO,coutTransportRemblais,nbVoyagesRemblais,detailRemblais,montantMarge,margeEntreprise,montantRemise,totalHT,totalTVA:totalHT*0.2,totalTTC:totalHT*1.2}
     })
-  },[volFouille,volDeco,distanceKm,selVehicule,selEngin,sel,form.produitsSup,form.produitsAssocies,coutCoudes,coutRehausses,coutElec,coutTerreVegetale,coutEpandage,form.remisePourcent,form.remiseMontant,form.remiseType,epandageData,ressources,tarifsMateriaux,tarifsChantier,moOpts,form.absenceEtudeSol,form.typeSolId,form.distanceDepotChantierKm])
+  },[volFouille,volDeco,distanceKm,selVehicule,selEngin,sel,form.produitsSup,form.produitsAssocies,coutCoudes,coutRehausses,coutElec,coutTerreVegetale,coutEpandage,form.remisePourcent,form.remiseMontant,form.remiseType,epandageData,ressources,tarifsMateriaux,tarifsChantier,moOpts,form.absenceEtudeSol,form.typeSolId,form.distanceDepotChantierKm,produits])
 
   const handleMapPlace = useCallback((id,lat,lng)=>{
     if(id==='anc'){set('gpsAncLat',lat);set('gpsAncLng',lng)}
@@ -298,7 +322,7 @@ export default function NewDevis() {
     mlPVCEnterres,volumeSablePVC:volSablePVC,
     vehiculeId:form.vehiculeId,vehiculeNom:selVehicule?.nom||'',
     vehiculeMortierId:form.vehiculeMortierId,vehiculeMortierNom:selVehiculeMortier?.nom||selVehicule?.nom||'',
-    enginId:form.enginId,enginNom:selEngin?.nom||'',typeSolId:form.typeSolId,
+    enginId:form.enginId,enginNom:selEngin?.nom||'',enginConsommationLH:selEngin?.consommationLH||0,typeSolId:form.typeSolId,
     nbPoseurs:parseInt(form.nbPoseurs)||2,epaisseurMortier:parseFloat(form.epaisseurMortier)||0.20,
     tuyauxAvantFiliere:parseFloat(form.tuyauxAvantFiliere)||0,tuyauxApresFiliere:parseFloat(form.tuyauxApresFiliere)||0,
     nbCoudesPVC:parseInt(form.nbCoudesPVC)||0,prixCoudePVC:tarifsMateriaux?.coudePVC||5,
@@ -580,16 +604,16 @@ export default function NewDevis() {
                 ['Engin location',`${scenarios[0].hEnginMin}h × ${selEngin?.coutHoraire||0}€/h = ${fmtC(scenarios[0].coutEnginLocation)}`],
                 ['Gasoil engin',`${scenarios[0].hEnginMin}h × ${selEngin?.consommationLH||0}L/h × ${tarifsChantier?.prixGasoilL||1.80}€ = ${fmtC(scenarios[0].coutGasoilEngin)}`],
                 ['Dépl. engin (forfait)',`${fmtC(scenarios[0].coutDeplEngin)}`],
-                ['Pelleur',`${scenarios[0].mainOeuvre.hPelleurFacture}h × ${scenarios[0].tarifHPelleur}€/h = ${fmtC(scenarios[0].coutPelleurExcav)}`],
+                ["Cond. d'engin",`${scenarios[0].mainOeuvre.hPelleurFacture}h × ${scenarios[0].tarifHPelleur}€/h = ${fmtC(scenarios[0].coutPelleurExcav)}`],
                 ['Dépl. opérateur',`${fmtC(tarifsChantier?.forfaitDepartOperateur||50)} + ${form.distanceDepotChantierKm||0}km × ${tarifsChantier?.prixKmOperateur||0.55}€ = ${fmtC(scenarios[0].coutDeplOperateur)}`],
               ].map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className="text-[10px] text-white font-medium">{v}</p></div>)}</div>
-              <p className="text-[8px] text-gray-600 mb-2">Excavation {scenarios[0].mainOeuvre.hExcav}h réelles → min {scenarios[0].joursEngin}j × {tarifsChantier?.heuresJourChantier||8}h = {scenarios[0].hEnginMin}h facturées · Pelleur : excav {scenarios[0].mainOeuvre.hPelleurExcav}h + attente {scenarios[0].mainOeuvre.hPellisteAttenteEvac}h = {scenarios[0].mainOeuvre.hPelleurTotal}h → facturé {scenarios[0].mainOeuvre.hPelleurFacture}h</p>
+              <p className="text-[8px] text-gray-600 mb-2">Excavation {scenarios[0].mainOeuvre.hExcav}h réelles → min {scenarios[0].joursEngin}j × {tarifsChantier?.heuresJourChantier||8}h = {scenarios[0].hEnginMin}h facturées · Cond. engin : excav {scenarios[0].mainOeuvre.hPelleurExcav}h + attente {scenarios[0].mainOeuvre.hPellisteAttenteEvac}h = {scenarios[0].mainOeuvre.hPelleurTotal}h → facturé {scenarios[0].mainOeuvre.hPelleurFacture}h</p>
               {/* B. ÉVACUATION */}
               <p className="text-[9px] text-gray-500 font-bold mt-1 mb-0.5">🚛 B. Évacuation remblais = {fmtC(scenarios[0].coutEvacuationTotal)}</p>
               <div className="grid grid-cols-3 gap-1 mb-2">{[
                 ['Véhicule km',`${scenarios[0].nbVoyages} voy. × ${distanceKm.toFixed(0)}km A/R × ${selVehicule?.prixKm||0}€/km = ${fmtC(scenarios[0].coutEvacVehiculeKm)}`],
                 ['Chauffeur',`${scenarios[0].mainOeuvre.hChauffeurEvac}h — forfait ${scenarios[0].nbTranchesChauffeur}×${scenarios[0].forfaitChauffeurMontant}€/${scenarios[0].forfaitChauffeurHeures}h (${scenarios[0].mainOeuvre.hChauffeurTotal}h total) = ${fmtC(scenarios[0].coutEvacChauffeur)}`],
-                ['Attente pelliste',`${scenarios[0].mainOeuvre.hPellisteAttenteEvac}h × ${scenarios[0].tarifHPelleur}€/h = ${fmtC(scenarios[0].coutEvacAttentePelliste)}`],
+                ['Attente cond. engin',`${scenarios[0].mainOeuvre.hPellisteAttenteEvac}h × ${scenarios[0].tarifHPelleur}€/h = ${fmtC(scenarios[0].coutEvacAttentePelliste)}`],
               ].map(([l,v])=><div key={l} className="bg-black/20 rounded p-1"><p className="text-[8px] text-gray-600">{l}</p><p className="text-[10px] text-white font-medium">{v}</p></div>)}</div>
               {/* C. MORTIER */}
               {scenarios[0].coutMortierTotal>0&&<><p className="text-[9px] text-gray-500 font-bold mt-1 mb-0.5">🏗️ C. Mortier = {fmtC(scenarios[0].coutMortierTotal)}</p>
@@ -672,7 +696,8 @@ export default function NewDevis() {
                 <div className="flex items-center justify-between mb-3"><h3 className={`text-sm font-bold ${scText[sc.scenarioId]||'text-white'}`}>{sc.scenarioNom}</h3></div>
                 <div className="grid grid-cols-3 gap-1.5 mb-3">{[{l:'Terrassement',v:`${sc.joursEngin||1}j (${sc.hExcav||'?'}h excav.)`},{l:'Voyages évac.',v:`${sc.nbVoyages}`},{l:'Vol. foisonné',v:`${sc.volFoison?.toFixed(1)||'?'}m³`}].map(i=><div key={i.l} className="bg-black/20 rounded p-1.5"><p className="text-[8px] text-gray-600">{i.l}</p><p className="text-[10px] font-medium text-white">{i.v}</p></div>)}</div>
                 <div className="space-y-1 text-[10px]">
-                  {[['⛏️ Terrassement',sc.coutTerrassementClient],['🚛 Évacuation (km+chauffeur+attente)',sc.coutTransportClient],sc.coutMortierTranspClient>0&&['🏗️ Transport mortier',sc.coutMortierTranspClient],sc.coutMortierMatiere>0&&[`🏗️ Mortier matière (${sc.volMortier?.toFixed(2)||0}m³)`,sc.coutMortierMatiere],sc.coutLivraisonClient>0&&['📦 Livraison matériaux',sc.coutLivraisonClient],[sel?.nom||'Matériel ANC',sc.coutMateriel],sc.coutProduitsSup>0&&['Produits suppl.',sc.coutProduitsSup],['Fournitures',sc.coutAssocies],coutCoudes>0&&['Coudes PVC',coutCoudes],coutRehausses>0&&['Rehausses',coutRehausses],coutElec>0&&['Électrique',coutElec],coutEpandage>0&&['Épandage',coutEpandage],coutTerreVegetale>0&&['Terre vég.',coutTerreVegetale],["👷 Pose",sc.coutPoseur],['Dossier photo',COUT_DOSSIER_PHOTO]].filter(Boolean).map(([l,v])=>(<div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="text-gray-300">{fmtC(v)}</span></div>))}
+                  {[['⛏️ Terrassement',sc.coutTerrassementClient],['🚛 Évacuation (km+chauffeur+attente)',sc.coutTransportClient],sc.coutMortierTranspClient>0&&['🏗️ Transport mortier',sc.coutMortierTranspClient],sc.coutMortierMatiere>0&&[`🏗️ Mortier matière (${sc.volMortier?.toFixed(2)||0}m³)`,sc.coutMortierMatiere],sc.coutLivraisonClient>0&&['📦 Livraison matériaux',sc.coutLivraisonClient],[sel?.nom||'Matériel ANC',sc.coutMateriel],sc.coutProduitsSup>0&&['Produits suppl.',sc.coutProduitsSup],['Fournitures',sc.coutAssocies],sc.coutTransportRemblais>0&&[`🚛 Transport remblais (${sc.nbVoyagesRemblais} voy.)`,sc.coutTransportRemblais],coutCoudes>0&&['Coudes PVC',coutCoudes],coutRehausses>0&&['Rehausses',coutRehausses],coutElec>0&&['Électrique',coutElec],coutEpandage>0&&['Épandage',coutEpandage],coutTerreVegetale>0&&['Terre vég.',coutTerreVegetale],["👷 Pose",sc.coutPoseur],['Dossier photo',COUT_DOSSIER_PHOTO]].filter(Boolean).map(([l,v])=>(<div key={l} className="flex justify-between"><span className="text-gray-500">{l}</span><span className="text-gray-300">{fmtC(v)}</span></div>))}
+                  {sc.montantMarge>0&&<div className="flex justify-between text-blue-400"><span>📈 Marge entreprise ({sc.margeEntreprise}%)</span><span>{fmtC(sc.montantMarge)}</span></div>}
                   {sc.montantRemise>0&&<div className="flex justify-between text-green-400 font-bold"><span>Remise {form.remiseType==='pourcent'?form.remisePourcent+'%':''}</span><span>- {fmtC(sc.montantRemise)}</span></div>}
                   <div className="flex justify-between pt-1 border-t border-white/10 font-bold"><span className="text-white">Total HT</span><span className="text-white">{fmtC(sc.totalHT)}</span></div>
                   <div className="flex justify-between"><span className="text-gray-500">TVA 20%</span><span>{fmtC(sc.totalTVA)}</span></div>

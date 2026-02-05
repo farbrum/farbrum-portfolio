@@ -174,7 +174,7 @@ function genScenario(doc, devis, scenarioIdx, isFirst) {
   y=ck(doc,y,60); y=secH(doc,y,'DÉTAIL FINANCIER')
   const fr2=[
     {_header:true,_cells:['Poste','Montant HT']},
-    // Terrassement = engins + gasoil + opérateur pelleur + mobilisation
+    // Terrassement = engins + gasoil + opérateur conducteur d'engin + mobilisation
     {_cells:['Terrassement',fmt(sc.coutTerrassementClient||0)]},
     // Transport évacuation = km véhicule + chauffeur
     {_cells:[`Transport évacuation (${sc.nbVoyages||0} voy.)`,fmt(sc.coutTransportClient||0)]},
@@ -217,9 +217,16 @@ function genScenario(doc, devis, scenarioIdx, isFirst) {
   if(devis.posteRelevage&&devis.coutLigneElec>0)fr2.push({_cells:[`Ligne élec ${devis.sectionCable||4}mm² (${devis.longueurCableElec||'?'}ml) + fourreau`,fmt(devis.coutLigneElec)]})
   if(devis.epandage&&sc.coutEpandage>0)fr2.push({_cells:['Épandage (gravier + drains)',fmt(sc.coutEpandage)]})
   if(devis.restaurationSurface&&devis.coutTerreVegetale>0)fr2.push({_cells:['Restauration surface (terre + graine)',fmt(devis.coutTerreVegetale)]})
-  // Main d'œuvre de pose (poseurs uniquement — pelleur et chauffeur déjà inclus ci-dessus)
+  // Transport remblais
+  if(sc.coutTransportRemblais>0)fr2.push({_cells:[`Transport remblais (${sc.nbVoyagesRemblais||0} voy.)`,fmt(sc.coutTransportRemblais)]})
+  // Main d'œuvre de pose (poseurs uniquement — conducteur d'engin et chauffeur déjà inclus ci-dessus)
   fr2.push({_cells:["Main d'œuvre de pose",fmt(sc.coutPoseur||0)]})
   fr2.push({_cells:['Dossier photographique (obligatoire)',fmt(100)]})
+
+  // Marge entreprise
+  if(sc.montantMarge>0){
+    fr2.push({_cells:[`Marge entreprise (${sc.margeEntreprise||0}%)`,fmt(sc.montantMarge)]})
+  }
 
   // Remise
   if(sc.montantRemise>0){
@@ -349,6 +356,18 @@ function genFicheTechnique(doc, devis) {
     if(devis.distanceTransportKm>0)y=tl(doc,y,'Distance A/R :',`${(devis.distanceTransportKm*2).toFixed(1)} km`)
   }
 
+  // Gasoil nécessaire
+  if(sc0?.mainOeuvre?.hEnginMin>0){
+    const enginData = devis.enginConsommationLH || 0
+    const litresGasoil = enginData > 0 ? Math.ceil(sc0.mainOeuvre.hEnginMin * enginData) : 0
+    if(litresGasoil > 0){
+      y+=2;y=secH(doc,y,'CARBURANT')
+      y=tl(doc,y,'Engin :',`${sc0.enginNom||'?'} — conso ${enginData} L/h`)
+      y=tl(doc,y,'Heures engin :',`${sc0.hEnginMin}h`)
+      y=tl(doc,y,'Gasoil a prevoir :',`${litresGasoil} litres (minimum)`)
+    }
+  }
+
   // Mortier
   const sc0 = devis.scenarios?.[0]
   if(sc0?.volMortier>0){
@@ -386,8 +405,8 @@ function genFicheTechnique(doc, devis) {
     const moRows = [
       {_header:true,_cells:['Poste','Durée']},
     ]
-    if(mo.hExcav>0)moRows.push({_cells:['Excavation (pelleur)',`${mo.hExcav}h`]})
-    if(mo.hPellisteAttenteEvac>0)moRows.push({_cells:['Attente pelliste (pendant transport)',`${mo.hPellisteAttenteEvac}h`]})
+    if(mo.hExcav>0)moRows.push({_cells:['Excavation (conducteur d'engin)',`${mo.hExcav}h`]})
+    if(mo.hPellisteAttenteEvac>0)moRows.push({_cells:['Attente conducteur d'engin (pendant transport)',`${mo.hPellisteAttenteEvac}h`]})
     if(mo.hChauffeurEvac>0)moRows.push({_cells:[`Chauffeur évacuation (${mo.nbVoyEvac} voy. × ${mo.hParVoyEvac}min)`,`${mo.hChauffeurEvac}h`]})
     if(mo.hChauffeurMortier>0)moRows.push({_cells:[`Chauffeur mortier (${mo.nbVoyMortier} voy. × ${mo.hParVoyMortier}min)`,`${mo.hChauffeurMortier}h`]})
     if(mo.hChauffeurLivraison>0)moRows.push({_cells:['Chauffeur livraison',`${mo.hChauffeurLivraison}h`]})

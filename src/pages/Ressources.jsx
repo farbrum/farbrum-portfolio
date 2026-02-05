@@ -8,7 +8,7 @@ const inp = "w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm 
 const lbl = "block text-[10px] font-semibold text-gray-500 uppercase tracking-wider mb-1"
 const COMPETENCES = ['excavation','transport','pose','tuyauterie','collage','remblai','livraison']
 const JOURS_SEMAINE = [{id:1,court:'Lun',nom:'Lundi'},{id:2,court:'Mar',nom:'Mardi'},{id:3,court:'Mer',nom:'Mercredi'},{id:4,court:'Jeu',nom:'Jeudi'},{id:5,court:'Ven',nom:'Vendredi'},{id:6,court:'Sam',nom:'Samedi'},{id:0,court:'Dim',nom:'Dimanche'}]
-const ROLES = [{id:'pelleur',nom:'Pelleur / Conducteur engin',icon:'🚜',color:'text-amber-400'},{id:'chauffeur',nom:'Chauffeur PL / Tracteur',icon:'🚛',color:'text-blue-400'},{id:'poseur',nom:'Poseur / Tuyauteur',icon:'🔧',color:'text-emerald-400'},{id:'chef',nom:'Chef de chantier',icon:'👷',color:'text-rose'},{id:'manoeuvre',nom:'Manœuvre',icon:'🧤',color:'text-gray-300'}]
+const ROLES = [{id:'pelleur',nom:'Conducteur d'engin',icon:'🚜',color:'text-amber-400'},{id:'chauffeur',nom:'Chauffeur PL / Tracteur',icon:'🚛',color:'text-blue-400'},{id:'poseur',nom:'Poseur / Tuyauteur',icon:'🔧',color:'text-emerald-400'},{id:'chef',nom:'Chef de chantier',icon:'👷',color:'text-rose'},{id:'manoeuvre',nom:'Manœuvre',icon:'🧤',color:'text-gray-300'}]
 const NOMS_MOIS = ['Janvier','Février','Mars','Avril','Mai','Juin','Juillet','Août','Septembre','Octobre','Novembre','Décembre']
 
 function getJoursFeries(annee) {
@@ -488,6 +488,12 @@ function TarifsSection() {
           <p className="col-span-2 text-[8px] text-gray-600">Le chauffeur est facturé par tranche entière. Ex : 500€/11h → 3h = 500€, 12h = 1 000€, 23h = 1 500€</p>
         </div>
       </Window>
+      <Window title="📈 Marge entreprise">
+        <div className="p-4 grid grid-cols-2 gap-3">
+          <div><label className={lbl}>Marge entreprise (%)</label><input type="number" step="0.5" min="0" max="100" value={tc.margeEntreprisePct||''} onChange={e=>setTC('margeEntreprisePct',e.target.value)} className={inp}/></div>
+          <div className="flex items-end"><p className="text-[9px] text-gray-500 pb-2">Appliquée automatiquement sur le sous-total HT de chaque devis avant remise.</p></div>
+        </div>
+      </Window>
       <Window title="📐 Coefficients & Matériaux">
         <div className="p-4 grid grid-cols-3 gap-3">
           <div><label className={lbl}>Coeff. foisonnement</label><input type="number" step="0.1" value={tc.coeffFoisonnement||''} onChange={e=>setTC('coeffFoisonnement',e.target.value)} className={inp}/></div>
@@ -606,7 +612,7 @@ export default function Ressources() {
       {tab==='personnel'&&(
         <>
           <div className="grid grid-cols-4 gap-3">
-            {[{l:'Total',v:resList.length,c:'text-rose'},{l:'Pelleurs',v:resList.filter(r=>r.role==='pelleur').length,c:'text-amber-400'},{l:'Chauffeurs',v:resList.filter(r=>r.role==='chauffeur').length,c:'text-blue-400'},{l:'Poseurs',v:resList.filter(r=>r.role==='poseur'||r.role==='manoeuvre'||r.role==='chef').length,c:'text-emerald-400'}].map(s=>(
+            {[{l:'Total',v:resList.length,c:'text-rose'},{l:'Conducteurs engin',v:resList.filter(r=>r.role==='pelleur').length,c:'text-amber-400'},{l:'Chauffeurs',v:resList.filter(r=>r.role==='chauffeur').length,c:'text-blue-400'},{l:'Poseurs',v:resList.filter(r=>r.role==='poseur'||r.role==='manoeuvre'||r.role==='chef').length,c:'text-emerald-400'}].map(s=>(
               <div key={s.l} className="bg-bg-card border border-white/5 rounded-lg p-3 text-center"><p className={`text-2xl font-bold ${s.c}`}>{s.v}</p><p className="text-[9px] text-gray-500 uppercase">{s.l}</p></div>
             ))}
           </div>
