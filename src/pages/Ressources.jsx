@@ -502,6 +502,7 @@ function TarifsSection() {
           <div><label className={lbl}>Mortier (€/m³)</label><input type="number" step="5" value={tm.mortierM3||''} onChange={e=>setTM('mortierM3',e.target.value)} className={inp}/></div>
           <div><label className={lbl}>PVC (€/ml)</label><input type="number" step="1" value={tm.pvcMl||''} onChange={e=>setTM('pvcMl',e.target.value)} className={inp}/></div>
           <div><label className={lbl}>Coude PVC (€)</label><input type="number" step="1" value={tm.coudePVC||''} onChange={e=>setTM('coudePVC',e.target.value)} className={inp}/></div>
+          <div><label className={lbl}>Bloc à bancher (€/u)</label><input type="number" step="0.1" value={tm.blocBancherU||''} onChange={e=>setTM('blocBancherU',e.target.value)} className={inp}/></div>
         </div>
       </Window>
     </div>

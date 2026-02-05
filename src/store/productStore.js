@@ -293,7 +293,7 @@ export function calcMainOeuvre(engin, typeSol, distanceChantierKm, vehicule, vol
   const joursEngin = hEnginMin > 0 ? Math.ceil(hEnginMin / hJour) : 0
 
   // ─── 2. TRANSPORT ÉVACUATION (véhicule + chauffeur) ───
-  const volFoison = volumeExcav * tc.coeffFoisonnement
+  const volFoison = volumeExcav * (tc.coeffFoisonnement || 1.3)
   const poids = volFoison * (typeSol?.densite || 1.5)
   let nbVoyEvac = 0
   if (vehicule && volFoison > 0) {

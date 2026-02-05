@@ -223,9 +223,8 @@ export default function NewDevis() {
   const nbBlocsDroits = parseInt(form.blocsNbDroits)||0
   const nbBlocsAngles = parseInt(form.blocsNbAngles)||0
   const nbBlocsTotal = nbBlocsDroits + nbBlocsAngles
-  const pxBlocDroit = parseFloat(form.blocsPrixDroit)||0
-  const pxBlocAngle = parseFloat(form.blocsPrixAngle)||0
-  const coutBlocs = (nbBlocsDroits * pxBlocDroit) + (nbBlocsAngles * pxBlocAngle)
+  const pxBlocDroit = parseFloat(form.blocsPrixDroit) || tarifsMateriaux?.blocBancherU || 0
+  const coutBlocs = nbBlocsTotal * pxBlocDroit
   const COUT_DOSSIER_PHOTO = 100
 
   const moOpts = useMemo(()=>({
@@ -338,7 +337,7 @@ export default function NewDevis() {
     posteRelevage:form.posteRelevage,longueurCableElec:parseFloat(form.longueurCableElec)||0,sectionCable:form.sectionCable,prixCableMl,prixFourreau:tarifsMateriaux?.fourreauElec||25,coutLigneElec:coutElec,
     nbRehausses:parseInt(form.nbRehausses)||0,prixRehausse:parseFloat(form.prixRehausse)||0,
     // Blocs à bancher
-    blocsABancher: nbBlocsTotal>0 ? { nbDroits:nbBlocsDroits, nbAngles:nbBlocsAngles, nbTotal:nbBlocsTotal, dimDroits:form.blocsDimDroits, dimAngles:form.blocsDimAngles, prixDroit:pxBlocDroit, prixAngle:pxBlocAngle, coutTotal:coutBlocs, notes:form.blocsNotes } : null,
+    blocsABancher: nbBlocsTotal>0 ? { nbBlocs:nbBlocsTotal, dimensions:form.blocsDimDroits, prixUnitaire:pxBlocDroit, coutTotal:coutBlocs, notes:form.blocsNotes } : null,
     restaurationSurface:form.restaurationSurface,restaurationDetails:form.restaurationDetails,
     restauration,
     terreVegetaleM3:restauration?.volumeTerre||0,prixTerreVegetaleM3:tarifsMateriaux?.terreVegetaleM3||25,coutTerreVegetale,
@@ -383,7 +382,7 @@ export default function NewDevis() {
             epandageData&&`Drains : ${epandageData.longueurDrainTotal} ml → ${Math.ceil(epandageData.longueurDrainTotal / 4)} barres de 4m`,
             form.posteRelevage&&`Câble élec : ${form.longueurCableElec||'?'} ml (${form.sectionCable}mm²)`,
             form.posteRelevage&&'Fourreau électrique',
-            nbBlocsTotal>0&&`Blocs bancher : ${nbBlocsDroits} droits + ${nbBlocsAngles} angles = ${nbBlocsTotal}`,
+            nbBlocsTotal>0&&`Blocs à bancher : ${nbBlocsTotal}`,
             'Dossier photo : 100€',
             ...form.produitsAssocies.map(p=>{const k=kitAssocies.find(x=>x.nom===p);return`✓ ${p} — ${fmtC(k?.prix||150)}`}),
             ...form.produitsSup.map(p=>`➕ ${p.nom} — ${p.prixHT}€`),
@@ -579,12 +578,11 @@ export default function NewDevis() {
                 <p>Hauteur mur : {blocsAuto.hauteurMur} m — Surface : {blocsAuto.surfaceMur} m²</p>
                 <p>{blocsAuto.nbRangs} rangs × {blocsAuto.blocsParRang} blocs/rang = <strong className="text-white">{blocsAuto.nbBlocs} blocs (20×20×50)</strong></p>
               </div>}
-              <div className="grid grid-cols-3 gap-2">
-                <div><label className="text-[9px] text-gray-600">Droits (qté)</label><input type="number" value={form.blocsNbDroits} onChange={e=>{set('blocsNbDroits',e.target.value);set('blocsManuel','1')}} min="0" className={inp} placeholder="0"/></div>
-                <div><label className="text-[9px] text-gray-600">Angles (qté)</label><input type="number" value={form.blocsNbAngles} onChange={e=>{set('blocsNbAngles',e.target.value);set('blocsManuel','1')}} min="0" className={inp} placeholder="0"/></div>
+              <div className="grid grid-cols-2 gap-2">
+                <div><label className="text-[9px] text-gray-600">Quantité</label><input type="number" value={form.blocsNbDroits} onChange={e=>{set('blocsNbDroits',e.target.value);set('blocsManuel','1')}} min="0" className={inp} placeholder="0"/></div>
                 <div><label className="text-[9px] text-gray-600">Total</label><p className="h-9 flex items-center text-sm text-white font-bold">{nbBlocsTotal>0?nbBlocsTotal:'—'}</p></div>
               </div>
-              {form.blocsManuel&&blocsAuto&&<button type="button" onClick={()=>{set('blocsNbDroits',String(blocsAuto.nbBlocs));set('blocsNbAngles','0');set('blocsManuel','')}} className="text-[9px] text-rose underline mt-1">↺ Recalculer automatiquement ({blocsAuto.nbBlocs} blocs)</button>}
+              {form.blocsManuel&&blocsAuto&&<button type="button" onClick={()=>{set('blocsNbDroits',String(blocsAuto.nbBlocs));set('blocsManuel','')}} className="text-[9px] text-rose underline mt-1">↺ Recalculer automatiquement ({blocsAuto.nbBlocs} blocs)</button>}
               {nbBlocsTotal>0&&<div className="mt-2 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
                   <div><label className="text-[9px] text-gray-600">Dimensions</label><select value={form.blocsDimDroits} onChange={e=>set('blocsDimDroits',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
