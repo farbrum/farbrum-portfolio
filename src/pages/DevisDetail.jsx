@@ -3,7 +3,8 @@ import { useParams, useNavigate } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
 import { useAuthStore } from '../store/authStore'
 import { pdfService } from '../services/pdfService'
-import { ArrowLeft, Download, Eye, Trash2, HardHat, Pencil, EyeOff, FileText, Layers } from 'lucide-react'
+import { envoyerCommandeFournisseur } from '../services/emailService'
+import { ArrowLeft, Download, Eye, Trash2, HardHat, Pencil, EyeOff, FileText, Layers, Package, Send, X, Check, Truck, Mail, Calendar, Clock, Loader2 } from 'lucide-react'
 import { format } from 'date-fns'
 import { fr } from 'date-fns/locale'
 import Window from '../components/Window'
@@ -22,6 +23,202 @@ const stLabel={brouillon:'Brouillon',envoyé:'Envoyé',accepté:'Accepté',refus
 const scColors={terre:'border-emerald-500/30 bg-emerald-500/5',roche50:'border-amber-500/30 bg-amber-500/5',roche100:'border-red-500/30 bg-red-500/5'}
 const scText={terre:'text-emerald-400',roche50:'text-amber-400',roche100:'text-red-400'}
 
+// ══════════════════════════════════════════════════════════════
+// MODAL COMMANDE FOURNISSEUR
+// ══════════════════════════════════════════════════════════════
+function CommandeFournisseurModal({ devis, onClose }) {
+  const { produits, fournisseurs } = useProductStore()
+  const [sending, setSending] = useState(false)
+  const [sent, setSent] = useState({})
+  const [dateLivraison, setDateLivraison] = useState('')
+  const [heureLivraison, setHeureLivraison] = useState('08:00')
+  
+  // Regrouper les produits par fournisseur
+  const produitsDevis = []
+  
+  // Produit principal
+  const prodPrincipal = produits.find(p => p.id === devis.produitId)
+  if (prodPrincipal) {
+    produitsDevis.push({
+      ...prodPrincipal,
+      quantite: 1,
+      notes: 'Produit principal ANC'
+    })
+  }
+  
+  // Produits supplémentaires
+  if (devis.produitsSup?.length) {
+    devis.produitsSup.forEach(ps => {
+      const p = produits.find(x => x.id === ps.id)
+      if (p) produitsDevis.push({ ...p, quantite: ps.quantite || 1, notes: ps.notes || '' })
+    })
+  }
+  
+  // Produits associés (fournitures)
+  if (devis.produitsAssocies?.length) {
+    devis.produitsAssocies.forEach(nom => {
+      produitsDevis.push({ nom, fournisseurId: null, refFournisseur: '', quantite: 1, notes: 'Kit associé' })
+    })
+  }
+  
+  // Blocs à bancher
+  if (devis.blocsABancher?.nbBlocs > 0) {
+    produitsDevis.push({
+      nom: `Blocs à bancher ${devis.blocsABancher.dimensions || '20×20×50'}`,
+      fournisseurId: null,
+      refFournisseur: '',
+      quantite: devis.blocsABancher.nbBlocs,
+      notes: devis.blocsABancher.notes || ''
+    })
+  }
+  
+  // Grouper par fournisseur
+  const parFournisseur = {}
+  produitsDevis.forEach(p => {
+    const fid = p.fournisseurId || '_sans_fournisseur'
+    if (!parFournisseur[fid]) parFournisseur[fid] = []
+    parFournisseur[fid].push(p)
+  })
+  
+  const handleEnvoyer = async (fournisseurId) => {
+    const fourn = fournisseurs.find(f => f.id === fournisseurId)
+    if (!fourn) return
+    
+    const prods = parFournisseur[fournisseurId] || []
+    if (prods.length === 0) return
+    
+    setSending(true)
+    try {
+      // Générer le PDF checklist en base64
+      const pdfBase64 = await pdfService.genererChecklistBase64(devis, fourn, prods, dateLivraison, heureLivraison)
+      
+      // Envoyer l'email
+      const result = await envoyerCommandeFournisseur({
+        fournisseur: fourn,
+        devis,
+        produits: prods,
+        dateLivraison,
+        heureLivraison,
+        pdfBase64
+      })
+      
+      if (result.success) {
+        setSent(prev => ({ ...prev, [fournisseurId]: true }))
+      } else {
+        alert('Erreur: ' + result.error)
+      }
+    } catch (err) {
+      alert('Erreur: ' + err.message)
+    }
+    setSending(false)
+  }
+  
+  const handleTelechargerChecklist = async (fournisseurId) => {
+    const fourn = fournisseurs.find(f => f.id === fournisseurId) || { nom: 'Sans fournisseur' }
+    const prods = parFournisseur[fournisseurId] || []
+    if (prods.length === 0) return
+    
+    try {
+      await pdfService.telechargerChecklistCommande(devis, fourn, prods, dateLivraison, heureLivraison)
+    } catch (err) {
+      alert('Erreur: ' + err.message)
+    }
+  }
+  
+  const inp = "w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose/30"
+  
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+      <div className="absolute inset-0 bg-black/80" onClick={onClose} />
+      <div className="relative w-full max-w-2xl max-h-[90vh] overflow-y-auto rounded-lg border border-rose shadow-[0_0_40px_rgba(200,80,155,0.15)]">
+        <div className="sticky top-0 z-10 h-10 bg-bg-card border-b border-rose/40 flex items-center justify-between px-4">
+          <span className="text-sm font-semibold text-white flex items-center gap-2"><Package className="w-4 h-4 text-emerald-400"/>Commande Fournisseurs</span>
+          <button onClick={onClose} className="text-gray-500 hover:text-rose"><X className="w-4 h-4" /></button>
+        </div>
+        <div className="bg-bg-card p-5 space-y-4">
+          {/* Date et heure de livraison */}
+          <div className="bg-amber-500/10 border border-amber-500/30 rounded-lg p-4">
+            <p className="text-xs text-amber-400 font-bold mb-3">📍 Livraison souhaitée</p>
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">Date</label>
+                <input type="date" value={dateLivraison} onChange={e => setDateLivraison(e.target.value)} className={inp} />
+              </div>
+              <div>
+                <label className="block text-[10px] text-gray-500 mb-1">Heure</label>
+                <input type="time" value={heureLivraison} onChange={e => setHeureLivraison(e.target.value)} className={inp} />
+              </div>
+            </div>
+            <p className="text-[10px] text-gray-500 mt-2">
+              📍 {devis.client?.adresse}, {devis.client?.codePostal} {devis.client?.ville}
+            </p>
+          </div>
+          
+          {/* Liste par fournisseur */}
+          {Object.entries(parFournisseur).map(([fid, prods]) => {
+            const fourn = fournisseurs.find(f => f.id === fid)
+            const hasEmail = fourn?.emailCommande || fourn?.email
+            const isSent = sent[fid]
+            
+            return (
+              <div key={fid} className="border border-white/10 rounded-lg overflow-hidden">
+                <div className="bg-white/5 px-4 py-2 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-bold text-white">{fourn?.nom || '📦 Sans fournisseur attribué'}</p>
+                    {fourn?.emailCommande && <p className="text-[10px] text-emerald-400">📧 {fourn.emailCommande}</p>}
+                    {!hasEmail && fourn && <p className="text-[10px] text-amber-400">⚠️ Aucun email configuré</p>}
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button onClick={() => handleTelechargerChecklist(fid)} className="h-7 px-2 bg-white/5 hover:bg-white/10 text-gray-300 text-[10px] rounded border border-white/10 flex items-center gap-1">
+                      <Download className="w-3 h-3"/><span>PDF</span>
+                    </button>
+                    {hasEmail && !isSent && (
+                      <button onClick={() => handleEnvoyer(fid)} disabled={sending} className="h-7 px-2 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-[10px] rounded border border-emerald-500/30 flex items-center gap-1 disabled:opacity-50">
+                        <Send className="w-3 h-3"/><span>{sending ? '...' : 'Envoyer'}</span>
+                      </button>
+                    )}
+                    {isSent && (
+                      <span className="h-7 px-2 bg-emerald-500/20 text-emerald-400 text-[10px] rounded border border-emerald-500/30 flex items-center gap-1">
+                        <Check className="w-3 h-3"/><span>Envoyé ✓</span>
+                      </span>
+                    )}
+                  </div>
+                </div>
+                <div className="p-3">
+                  <table className="w-full text-[11px]">
+                    <thead>
+                      <tr className="text-gray-500 border-b border-white/10">
+                        <th className="text-left py-1 font-medium">Réf.</th>
+                        <th className="text-left py-1 font-medium">Désignation</th>
+                        <th className="text-center py-1 font-medium">Qté</th>
+                        <th className="text-left py-1 font-medium">Notes</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {prods.map((p, i) => (
+                        <tr key={i} className="border-b border-white/5">
+                          <td className="py-1.5 text-gray-400 font-mono">{p.refFournisseur || '—'}</td>
+                          <td className="py-1.5 text-white">{p.nom}</td>
+                          <td className="py-1.5 text-center text-white font-bold">{p.quantite}</td>
+                          <td className="py-1.5 text-gray-500">{p.notes}</td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )
+          })}
+          
+          {Object.keys(parFournisseur).length === 0 && (
+            <p className="text-center text-gray-500 py-8">Aucun produit à commander</p>
+          )}
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function DevisDetail() {
   const {id}=useParams();const navigate=useNavigate();const {user}=useAuthStore();const isAdmin=user?.role==='admin'
   const {getDevisById,deleteDevis,updateDevis}=useDevisStore()
@@ -30,6 +227,8 @@ export default function DevisDetail() {
   const [showRedac,setShowRedac]=useState(false)
   const [pdfMsg,setPdfMsg]=useState('')
   const [showQR,setShowQR]=useState(false)
+  const [showCommande,setShowCommande]=useState(false)
+  const [showCommande,setShowCommande]=useState(false)
 
   if(!devis)return<Window title="Erreur"><div className="p-8 text-center"><p className="text-sm text-gray-400">Devis non trouvé.</p></div></Window>
 
@@ -173,6 +372,11 @@ export default function DevisDetail() {
           <button type="button" onClick={async()=>{setPdfMsg('Téléchargement...');try{await pdfService.telechargerFichePoseur(devis);setPdfMsg('')}catch(e){setPdfMsg('Erreur: '+e.message)}}} className="w-full h-9 bg-white/5 hover:bg-white/10 text-gray-300 text-xs font-medium rounded border border-white/10 flex items-center justify-center space-x-1.5"><Download className="w-3.5 h-3.5"/><span>Télécharger PDF Poseur</span></button>
         </div></Window>}
 
+        {isAdmin&&(devis.statut==='accepté'||devis.statut==='en_cours')&&<Window title="📦 Commande Fournisseur"><div className="p-4 space-y-2">
+          <p className="text-[9px] text-gray-500 mb-2">Envoyer un email au fournisseur avec la checklist des matériaux à préparer.</p>
+          <button type="button" onClick={()=>setShowCommande(true)} className="w-full h-9 bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 text-xs font-medium rounded border border-emerald-500/30 flex items-center justify-center space-x-1.5"><Truck className="w-3.5 h-3.5"/><span>Préparer la commande</span></button>
+        </div></Window>}
+
         {/* SUIVI CHANTIER */}
         {isAdmin&&(() => {
           const chantierData = useChantierStore.getState().chantiers[id]
@@ -209,6 +413,14 @@ export default function DevisDetail() {
         {isAdmin&&<Window title="Statut"><div className="p-4"><select value={devis.statut} onChange={e=>updateDevis(id,{statut:e.target.value})} className="w-full h-9 px-3 bg-bg-input border border-white/10 rounded text-sm text-white focus:outline-none focus:ring-2 focus:ring-rose/30 focus:border-rose">{Object.entries(stLabel).map(([k,v])=><option key={k} value={k}>{v}</option>)}</select></div></Window>}
 
         {showFiche&&<FicheChantier devis={devis}/>}
+
+        {/* COMMANDE FOURNISSEUR — visible quand statut accepté ou en_cours */}
+        {isAdmin&&(devis.statut==='accepté'||devis.statut==='en_cours')&&<Window title="📦 Commande Fournisseur"><div className="p-4">
+          <p className="text-[10px] text-gray-500 mb-3">Envoyez la liste des matériaux aux fournisseurs avec une checklist pour le magasinier.</p>
+          <button onClick={()=>setShowCommande(true)} className="w-full h-10 bg-emerald-500/20 hover:bg-emerald-500/30 text-emerald-400 text-sm font-semibold rounded border border-emerald-500/30 flex items-center justify-center space-x-2"><Package className="w-4 h-4"/><span>Préparer la commande</span></button>
+        </div></Window>}
+
+        {showCommande&&<CommandeFournisseurModal devis={devis} onClose={()=>setShowCommande(false)}/>}
 
         {isAdmin&&<Window title="Zone de danger"><div className="p-4"><button onClick={()=>{if(confirm('Supprimer ?')){deleteDevis(id);navigate('/')}}} className="w-full h-9 bg-red-500/10 hover:bg-red-500/20 text-red-400 text-xs font-semibold rounded border border-red-500/20 flex items-center justify-center space-x-1.5"><Trash2 className="w-3.5 h-3.5"/><span>Supprimer</span></button></div></Window>}
       </div>
