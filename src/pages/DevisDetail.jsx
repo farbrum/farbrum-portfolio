@@ -15,7 +15,7 @@ import { useProductStore } from '../store/productStore'
 
 const MODES={souterrain:'Souterrain',aerien:'Aérien',semi_enterre:'Semi-enterré'}
 const TYPES={microstation:'Microstation',filtre_compact:'Filtre compact',filtre_epandage:'Filtre + Épandage',fosse_epandage:'Fosse + Épandage',autre:'Autre'}
-const REJETS={infiltration:'Infiltration',pluvial:'Pluvial communal',cours_eau:"Cours d'eau / fossé",puits:"Puits d'infiltration"}
+const REJETS={infiltration:'Infiltration',pluvial_communal:'Pluvial communal',pluvial_departemental:'Pluvial départemental',cours_eau:"Cours d'eau / fossé",puits:"Puits d'infiltration",caniveau:'Caniveau',epandage:'Épandage'}
 const fmtC=v=>{const n=Number(v||0);const p=n.toFixed(2).split('.');p[0]=p[0].replace(/\B(?=(\d{3})+(?!\d))/g,'.');return p.join(',')+' €'}
 const stStyle={brouillon:'text-gray-400 bg-white/5',envoyé:'text-blue-400 bg-blue-500/10',accepté:'text-emerald-400 bg-emerald-500/10',refusé:'text-red-400 bg-red-500/10',en_cours:'text-amber-400 bg-amber-500/10',terminé:'text-teal-400 bg-teal-500/10'}
 const stLabel={brouillon:'Brouillon',envoyé:'Envoyé',accepté:'Accepté',refusé:'Refusé',en_cours:'En cours',terminé:'Terminé'}

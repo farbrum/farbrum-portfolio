@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import { useDevisStore } from '../store/devisStore'
-import { useProductStore, calcVolumeFouilleProduit, calcVolumeCuvesStrict, calcVolumeRemblais, calcVolumeSablePVC, calcMLPVCEnterres, calcRehausses, calcEpandage, calcSurfaceFouilleProduit, calcRestauration, TYPES_SOL, ENGINS, KITS_ASSOCIES, SECTIONS_REDACTIONNELLES, calcScenario, getJoursDisponibles, trouverProchainCreneau } from '../store/productStore'
+import { useProductStore, calcVolumeFouilleProduit, calcVolumeCuvesStrict, calcVolumeRemblais, calcVolumeSablePVC, calcMLPVCEnterres, calcRehausses, calcEpandage, calcSurfaceFouilleProduit, calcRestauration, calcBlocsABancher, TYPES_SOL, ENGINS, KITS_ASSOCIES, SECTIONS_REDACTIONNELLES, calcScenario, getJoursDisponibles, trouverProchainCreneau } from '../store/productStore'
 import { useAuthStore } from '../store/authStore'
 import { rechercherCommunes } from '../services/geoService'
 import MapPicker, { roadDistance } from '../components/MapPicker'
@@ -27,9 +27,9 @@ const MODES_INSTALLATION = [
   {id:'semi_enterre',nom:'Semi-enterré',d:'Partie enterrée, partie hors-sol'},
 ]
 const TYPES_REJET = [
-  {id:'infiltration',nom:'Infiltration (sol)'},{id:'pluvial',nom:'Réseau pluvial communal'},{id:'cours_eau',nom:"Cours d'eau / fossé"},{id:'puits',nom:"Puits d'infiltration"},
+  {id:'infiltration',nom:'Infiltration (sol)'},{id:'pluvial_communal',nom:'Réseau pluvial communal'},{id:'pluvial_departemental',nom:'Réseau pluvial départemental'},{id:'cours_eau',nom:"Cours d'eau / fossé"},{id:'puits',nom:"Puits d'infiltration"},{id:'caniveau',nom:'Caniveau de surface'},{id:'epandage',nom:'Épandage'},
 ]
-const REJETS_LABELS={infiltration:'Infiltration',pluvial:'Pluvial communal',cours_eau:"Cours d'eau",puits:"Puits d'infiltration"}
+const REJETS_LABELS={infiltration:'Infiltration',pluvial_communal:'Pluvial communal',pluvial_departemental:'Pluvial départemental',cours_eau:"Cours d'eau",puits:"Puits d'infiltration",caniveau:'Caniveau',epandage:'Épandage'}
 const hasEpandage = t => t === 'filtre_epandage' || t === 'fosse_epandage'
 
 export default function NewDevis() {
@@ -61,7 +61,7 @@ export default function NewDevis() {
     posteRelevage:false,longueurCableElec:'',sectionCable:'4',
     nbRehausses:'0',prixRehausse:'35',
     // Blocs à bancher
-    blocsNbDroits:'',blocsNbAngles:'',blocsDimDroits:'20×20×50',blocsDimAngles:'20×20×50',blocsPrixDroit:'',blocsPrixAngle:'',blocsNotes:'',
+    blocsNbDroits:'',blocsNbAngles:'',blocsDimDroits:'20×20×50',blocsDimAngles:'20×20×50',blocsPrixDroit:'',blocsPrixAngle:'',blocsNotes:'',blocsManuel:'',
     restaurationSurface:false,restaurationDetails:'',
     terreVegetaleM3:'',prixTerreVegetaleM3:'25',
     notesInstallateur:'',
@@ -212,7 +212,14 @@ export default function NewDevis() {
   const coutElec = form.posteRelevage ? ((parseFloat(form.longueurCableElec)||0) * prixCableMl + (tarifsMateriaux?.fourreauElec||25)) : 0
   const coutTerreVegetale = restauration ? restauration.coutTotal : 0
   const coutEpandage = epandageData ? (epandageData.volumeGravier * 45 + epandageData.longueurDrainTotal * 3) : 0
-  // Blocs à bancher
+  // Blocs à bancher — calcul automatique
+  const blocsAuto = useMemo(() => calcBlocsABancher(sel), [sel])
+  useEffect(() => {
+    if (blocsAuto && !isEdit && !form.blocsManuel) {
+      set('blocsNbDroits', String(blocsAuto.nbBlocs))
+      set('blocsNbAngles', '0')
+    }
+  }, [blocsAuto])
   const nbBlocsDroits = parseInt(form.blocsNbDroits)||0
   const nbBlocsAngles = parseInt(form.blocsNbAngles)||0
   const nbBlocsTotal = nbBlocsDroits + nbBlocsAngles
@@ -566,22 +573,24 @@ export default function NewDevis() {
             </div>
 
             {/* BLOCS À BANCHER */}
-            <div className="border-t border-white/5 pt-3"><label className={lbl}>🧱 Blocs à bancher</label>
+            <div className="border-t border-white/5 pt-3"><label className={lbl}>🧱 Blocs à bancher {blocsAuto ? '(calcul auto)' : ''}</label>
+              {blocsAuto&&<div className="text-[9px] text-gray-500 mb-2 bg-black/20 rounded p-2">
+                <p>Périmètre int. mur : {blocsAuto.perimetreInt} m — ext. : {blocsAuto.perimetreExt} m</p>
+                <p>Hauteur mur : {blocsAuto.hauteurMur} m — Surface : {blocsAuto.surfaceMur} m²</p>
+                <p>{blocsAuto.nbRangs} rangs × {blocsAuto.blocsParRang} blocs/rang = <strong className="text-white">{blocsAuto.nbBlocs} blocs (20×20×50)</strong></p>
+              </div>}
               <div className="grid grid-cols-3 gap-2">
-                <div><label className="text-[9px] text-gray-600">Droits (qté)</label><input type="number" value={form.blocsNbDroits} onChange={e=>set('blocsNbDroits',e.target.value)} min="0" className={inp} placeholder="0"/></div>
-                <div><label className="text-[9px] text-gray-600">Angles (qté)</label><input type="number" value={form.blocsNbAngles} onChange={e=>set('blocsNbAngles',e.target.value)} min="0" className={inp} placeholder="0"/></div>
+                <div><label className="text-[9px] text-gray-600">Droits (qté)</label><input type="number" value={form.blocsNbDroits} onChange={e=>{set('blocsNbDroits',e.target.value);set('blocsManuel','1')}} min="0" className={inp} placeholder="0"/></div>
+                <div><label className="text-[9px] text-gray-600">Angles (qté)</label><input type="number" value={form.blocsNbAngles} onChange={e=>{set('blocsNbAngles',e.target.value);set('blocsManuel','1')}} min="0" className={inp} placeholder="0"/></div>
                 <div><label className="text-[9px] text-gray-600">Total</label><p className="h-9 flex items-center text-sm text-white font-bold">{nbBlocsTotal>0?nbBlocsTotal:'—'}</p></div>
               </div>
+              {form.blocsManuel&&blocsAuto&&<button type="button" onClick={()=>{set('blocsNbDroits',String(blocsAuto.nbBlocs));set('blocsNbAngles','0');set('blocsManuel','')}} className="text-[9px] text-rose underline mt-1">↺ Recalculer automatiquement ({blocsAuto.nbBlocs} blocs)</button>}
               {nbBlocsTotal>0&&<div className="mt-2 space-y-2">
                 <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-[9px] text-gray-600">Dim. droits</label><select value={form.blocsDimDroits} onChange={e=>set('blocsDimDroits',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
-                  <div><label className="text-[9px] text-gray-600">Dim. angles</label><select value={form.blocsDimAngles} onChange={e=>set('blocsDimAngles',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
+                  <div><label className="text-[9px] text-gray-600">Dimensions</label><select value={form.blocsDimDroits} onChange={e=>set('blocsDimDroits',e.target.value)} className={inp}><option value="20×20×50">20×20×50 cm</option><option value="20×25×50">20×25×50 cm</option><option value="20×20×25">20×20×25 cm</option><option value="15×20×50">15×20×50 cm</option></select></div>
+                  <div><label className="text-[9px] text-gray-600">Prix unitaire (€ HT)</label><input type="number" value={form.blocsPrixDroit} onChange={e=>set('blocsPrixDroit',e.target.value)} min="0" step="0.1" className={inp} placeholder="ex: 2.50"/></div>
                 </div>
-                <div className="grid grid-cols-2 gap-2">
-                  <div><label className="text-[9px] text-gray-600">Prix u. droit (€ HT)</label><input type="number" value={form.blocsPrixDroit} onChange={e=>set('blocsPrixDroit',e.target.value)} min="0" step="0.1" className={inp} placeholder="ex: 2.50"/></div>
-                  <div><label className="text-[9px] text-gray-600">Prix u. angle (€ HT)</label><input type="number" value={form.blocsPrixAngle} onChange={e=>set('blocsPrixAngle',e.target.value)} min="0" step="0.1" className={inp} placeholder="ex: 3.50"/></div>
-                </div>
-                {coutBlocs>0&&<p className="text-[9px] text-gray-500">Total blocs : {nbBlocsDroits>0?`${nbBlocsDroits}×${fmtC(pxBlocDroit)}`:''}{nbBlocsDroits>0&&nbBlocsAngles>0?' + ':''}{nbBlocsAngles>0?`${nbBlocsAngles}×${fmtC(pxBlocAngle)}`:''} = <strong className="text-white">{fmtC(coutBlocs)}</strong></p>}
+                {coutBlocs>0&&<p className="text-[9px] text-gray-500">Total blocs : {nbBlocsTotal} × {fmtC(pxBlocDroit)} = <strong className="text-white">{fmtC(coutBlocs)}</strong></p>}
                 <input value={form.blocsNotes} onChange={e=>set('blocsNotes',e.target.value)} className={inp} placeholder="Notes (optionnel)"/>
               </div>}
             </div>

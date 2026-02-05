@@ -3,6 +3,34 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthStore } from '../store/authStore'
 import { ArrowRight, Eye, EyeOff, Shield, Lock, AlertTriangle, Loader2 } from 'lucide-react'
 import Window from '../components/Window'
+import { backup } from '../services/supabase'
+
+// Détecte si on est sur Mac (pas iPhone/iPad)
+function isMacDesktop() {
+  const ua = navigator.userAgent
+  const isMac = /Macintosh|Mac OS X/i.test(ua)
+  const isIOS = /iPhone|iPad|iPod/i.test(ua)
+  return isMac && !isIOS
+}
+
+// Backup automatique sur Mac uniquement
+async function autoBackupIfMac() {
+  if (!isMacDesktop()) {
+    console.log('[Backup] Skipped: not a Mac desktop')
+    return
+  }
+  console.log('[Backup] Mac detected, starting auto backup...')
+  try {
+    const result = await backup.downloadBackup()
+    if (result.success) {
+      console.log('[Backup] ✅ Auto backup completed')
+    } else {
+      console.warn('[Backup] ⚠️ Auto backup failed:', result.error)
+    }
+  } catch (err) {
+    console.error('[Backup] ❌ Auto backup error:', err)
+  }
+}
 
 // ─── Écran 1 : Code Entreprise ───
 function EcranCodeEntreprise({ onSuccess }) {
@@ -136,6 +164,8 @@ function EcranLogin() {
     try {
       const ok = await login(email, password)
       if (ok) {
+        // Backup automatique sur Mac uniquement
+        autoBackupIfMac()
         navigate('/')
       } else {
         setError('Email ou mot de passe incorrect')

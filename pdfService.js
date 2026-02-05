@@ -6,7 +6,7 @@ const ROSE = [195, 56, 121]
 const ROSE_LIGHT = [235, 180, 210]
 const TYPES = { microstation:'Microstation', filtre_compact:'Filtre compact', filtre_epandage:'Filtre + Épandage', fosse_epandage:'Fosse + Épandage', autre:'Autre' }
 const MODES = { souterrain:'Souterrain (enterré)', aerien:'Aérien (hors-sol)', semi_enterre:'Semi-enterré' }
-const REJETS = { infiltration:'Infiltration (sol)', pluvial_communal:'Réseau pluvial communal', pluvial_departemental:'Réseau pluvial départemental', cours_eau:"Cours d'eau / fossé", puits:"Puits d'infiltration", caniveau:'Caniveau de surface', epandage:'Épandage' }
+const REJETS = { infiltration:'Infiltration (sol)', pluvial:'Réseau pluvial communal', cours_eau:"Cours d'eau / fossé", puits:"Puits d'infiltration" }
 const fmt = v => {
   const n = Number(v||0)
   const parts = n.toFixed(2).split('.')
@@ -359,25 +359,14 @@ function genFicheTechnique(doc, devis) {
   // Scénario principal
   const sc0 = devis.scenarios?.[0]
 
-  // Gasoil nécessaire — DEBUG
-  console.log('🔥 GASOIL DEBUG:', {
-    sc0Exists: !!sc0,
-    mainOeuvre: sc0?.mainOeuvre ? 'OUI' : 'NON',
-    hEnginMin_mo: sc0?.mainOeuvre?.hEnginMin,
-    hEnginMin_root: sc0?.hEnginMin,
-    enginConsommationLH: devis.enginConsommationLH,
-    enginNom: devis.enginNom,
-    scenariosLength: devis.scenarios?.length,
-    sc0Keys: sc0 ? Object.keys(sc0).slice(0,15) : 'null',
-  })
-  const hEnginPdf = sc0?.mainOeuvre?.hEnginMin || sc0?.hEnginMin || 0
-  const enginConsoPdf = devis.enginConsommationLH || 0
-  if(hEnginPdf > 0 && enginConsoPdf > 0){
-    const litresGasoil = Math.ceil(hEnginPdf * enginConsoPdf)
+  // Gasoil nécessaire
+  if(sc0?.mainOeuvre?.hEnginMin>0){
+    const enginData = devis.enginConsommationLH || 0
+    const litresGasoil = enginData > 0 ? Math.ceil(sc0.mainOeuvre.hEnginMin * enginData) : 0
     if(litresGasoil > 0){
       y+=2;y=secH(doc,y,'CARBURANT')
-      y=tl(doc,y,'Engin :',`${devis.enginNom||'?'} — conso ${enginConsoPdf} L/h`)
-      y=tl(doc,y,'Heures engin :',`${hEnginPdf}h`)
+      y=tl(doc,y,'Engin :',`${devis.enginNom||'?'} — conso ${enginData} L/h`)
+      y=tl(doc,y,'Heures engin :',`${sc0.mainOeuvre.hEnginMin}h`)
       y=tl(doc,y,'Gasoil a prevoir :',`${litresGasoil} litres (minimum)`)
     }
   }
